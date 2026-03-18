@@ -42,7 +42,12 @@ namespace PerfProblemSimulator.App_Start
 - Health endpoints remain responsive even under stress
 - Real-time dashboard shows metrics and active simulations");
 
-                    c.IncludeXmlComments(GetXmlCommentsPath());
+                    // Include XML comments if the file exists (may not be present in all deployment scenarios)
+                    var xmlPath = GetXmlCommentsPath();
+                    if (!string.IsNullOrEmpty(xmlPath) && System.IO.File.Exists(xmlPath))
+                    {
+                        c.IncludeXmlComments(xmlPath);
+                    }
 
                     // Use camelCase for JSON property names
                     c.DescribeAllEnumsAsStrings();
@@ -56,16 +61,30 @@ namespace PerfProblemSimulator.App_Start
         private static string GetXmlCommentsPath()
         {
             var baseDirectory = System.AppDomain.CurrentDomain.BaseDirectory;
-            var xmlPath = System.IO.Path.Combine(baseDirectory, "bin", "PerfProblemSimulator.xml");
             
-            // Check if file exists at expected location
-            if (!System.IO.File.Exists(xmlPath))
+            // Try multiple possible locations for the XML documentation file
+            var possiblePaths = new[]
             {
-                // Try without bin folder
-                xmlPath = System.IO.Path.Combine(baseDirectory, "PerfProblemSimulator.xml");
+                // Azure App Service / IIS deployment (XML alongside DLLs in bin)
+                System.IO.Path.Combine(baseDirectory, "bin", "PerfProblemSimulator.xml"),
+                // Alternative deployment structure (XML in root)
+                System.IO.Path.Combine(baseDirectory, "PerfProblemSimulator.xml"),
+                // Same directory as the executing assembly
+                System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(typeof(SwaggerConfig).Assembly.Location) ?? baseDirectory,
+                    "PerfProblemSimulator.xml")
+            };
+            
+            foreach (var path in possiblePaths)
+            {
+                if (System.IO.File.Exists(path))
+                {
+                    return path;
+                }
             }
             
-            return xmlPath;
+            // Return null if not found - caller should check for existence
+            return null;
         }
     }
 }
