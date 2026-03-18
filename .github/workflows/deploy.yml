@@ -47,11 +47,12 @@ jobs:
           # Copy Global.asax to root
           Copy-Item -Path ./src/PerfProblemSimulator/Global.asax -Destination ./deploy/ -Force
           
-          # Copy NLog.config to bin (or root, depending on config)
+          # Copy NLog.config to root
           Copy-Item -Path ./src/PerfProblemSimulator/NLog.config -Destination ./deploy/ -Force
           
-          # Copy wwwroot static files
-          Copy-Item -Path ./src/PerfProblemSimulator/wwwroot -Destination ./deploy/ -Recurse -Force
+          # Copy wwwroot static files CONTENTS to root (not as subfolder)
+          # This allows IIS to serve them directly
+          Copy-Item -Path ./src/PerfProblemSimulator/wwwroot/* -Destination ./deploy/ -Recurse -Force
           
           # List deployment contents
           Get-ChildItem -Path ./deploy -Recurse | Select-Object FullName
@@ -62,6 +63,13 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Clean stale wwwroot subfolder
+        shell: pwsh
+        run: |
+          # Remove nested wwwroot folder from previous deployment
+          az rest --method DELETE --uri "https://perfsimasp48.scm.azurewebsites.net/api/vfs/site/wwwroot/wwwroot/?recursive=true" --resource "https://management.azure.com/" 2>$null
+        continue-on-error: true
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
