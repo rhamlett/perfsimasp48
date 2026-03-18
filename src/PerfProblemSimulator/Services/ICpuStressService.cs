@@ -1,22 +1,24 @@
 using PerfProblemSimulator.Models;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Interface for the CPU stress service that triggers high CPU usage simulations.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <strong>Educational Note:</strong> Using an interface allows for:
-/// <list type="bullet">
-/// <item>Dependency injection and loose coupling</item>
-/// <item>Easy mocking in unit tests</item>
-/// <item>Potential for different implementations (e.g., a safer "fake" stress for testing)</item>
-/// </list>
-/// </para>
-/// </remarks>
-public interface ICpuStressService
+namespace PerfProblemSimulator.Services
 {
+    /// <summary>
+    /// Interface for the CPU stress service that triggers high CPU usage simulations.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Educational Note:</strong> Using an interface allows for:
+    /// <list type="bullet">
+    /// <item>Dependency injection and loose coupling</item>
+    /// <item>Easy mocking in unit tests</item>
+    /// <item>Potential for different implementations (e.g., a safer "fake" stress for testing)</item>
+    /// </list>
+    /// </para>
+    /// </remarks>
+    public interface ICpuStressService
+    {
     /// <summary>
     /// Triggers a CPU stress simulation that runs for the specified duration.
     /// </summary>
@@ -48,4 +50,5 @@ public interface ICpuStressService
     /// </para>
     /// </remarks>
     Task<SimulationResult> TriggerCpuStressAsync(int durationSeconds, CancellationToken cancellationToken, string level = "high");
+    }
 }

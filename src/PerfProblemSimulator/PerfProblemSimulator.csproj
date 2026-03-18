@@ -1,35 +1,95 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <!--
-    Performance Problem Simulator - Web API Project
-    Common properties (TargetFramework, Nullable, ImplicitUsings) are inherited from Directory.Build.props
+    Performance Problem Simulator - ASP.NET Framework 4.8 Web API Project
+    
+    This project uses OWIN self-hosting with:
+    - ASP.NET Web API 2 for REST endpoints
+    - SignalR 2.x for real-time WebSocket communication
+    - Unity for dependency injection
   -->
 
   <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    
     <!-- Enable unsafe code for AccessViolation crash simulation -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     
-    <!-- 
-      Use InProcess hosting for Azure App Service.
-      This runs the app inside w3wp.exe (IIS worker process) instead of a separate dotnet.exe.
-      Azure Crash Monitoring monitors w3wp.exe, so InProcess is required for crash dump collection.
-    -->
-    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <!-- Ensure proper output paths -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    
+    <!-- Use C# latest language version available for .NET Framework 4.8 -->
+    <LangVersion>latest</LangVersion>
+    
+    <!-- Disable nullable reference types - not fully supported in .NET Framework 4.8 -->
+    <Nullable>disable</Nullable>
+    
+    <!-- Generate XML documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1570;CS1574;CS4014;NU1603</NoWarn>
+    
+    <!-- Disable default content items to avoid duplicates with explicit includes -->
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
 
-  <!-- .NET 10 specific packages -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+  <!-- NuGet Package References -->
+  <ItemGroup>
+    <!-- OWIN and Web Hosting -->
+    <PackageReference Include="Microsoft.Owin" Version="4.2.2" />
+    <PackageReference Include="Microsoft.Owin.Host.SystemWeb" Version="4.2.2" />
+    <PackageReference Include="Microsoft.Owin.SelfHost" Version="4.2.2" />
+    <PackageReference Include="Microsoft.Owin.Cors" Version="4.2.2" />
+    <PackageReference Include="Microsoft.Owin.StaticFiles" Version="4.2.2" />
+    
+    <!-- ASP.NET Web API 2 -->
+    <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.3.0" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.3.0" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.3.0" />
+    
+    <!-- SignalR 2.x -->
+    <PackageReference Include="Microsoft.AspNet.SignalR.Core" Version="2.4.3" />
+    <PackageReference Include="Microsoft.AspNet.SignalR.SelfHost" Version="2.4.3" />
+    
+    <!-- Dependency Injection -->
+    <PackageReference Include="Unity" Version="5.11.10" />
+    <PackageReference Include="Unity.Container" Version="5.11.11" />
+    <PackageReference Include="Unity.WebApi" Version="5.4.0" />
+    
+    <!-- JSON Serialization -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    
+    <!-- Swagger / OpenAPI documentation -->
+    <PackageReference Include="Swashbuckle.Core" Version="5.6.0" />
+    
+    <!-- Logging -->
+    <PackageReference Include="NLog" Version="5.3.4" />
+    <PackageReference Include="NLog.Web" Version="5.3.14" />
+    
+    <!-- JetBrains Annotations -->
+    <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
+    
+    <!-- System.Net.Http for HttpClient -->
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    
+    <!-- System.Threading.Tasks.Extensions for ValueTask -->
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>
 
-  <!-- .NET 8 specific packages -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
-  </ItemGroup>
+  <!-- Framework References -->
   <ItemGroup>
-    <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+  </ItemGroup>
+
+  <!-- Content files that should be copied to output -->
+  <ItemGroup>
+    <Content Include="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="web.config" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="NLog.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Generate build timestamp as assembly metadata -->

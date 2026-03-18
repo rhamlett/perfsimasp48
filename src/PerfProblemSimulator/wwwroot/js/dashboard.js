@@ -212,83 +212,99 @@ function getCurrentUtcTime() {
  * Initialize SignalR connection to the metrics hub.
  * 
  * Educational Note:
- * SignalR automatically negotiates the best transport (WebSocket, SSE, Long Polling).
- * We use withAutomaticReconnect() to handle temporary disconnections gracefully.
+ * SignalR 2.x automatically negotiates the best transport (WebSocket, SSE, Long Polling).
+ * The jQuery client uses proxies generated at /signalr/hubs.
+ * 
+ * Note for .NET Framework 4.8 conversion:
+ * Changed from @microsoft/signalr (ASP.NET Core SignalR) to jQuery SignalR 2.x client.
+ * Key differences:
+ * - Core: new signalR.HubConnectionBuilder().withUrl('/hubs/metrics').build()
+ * - 2.x:  $.connection.metricsHub (using auto-generated proxy)
+ * - Core: connection.on('receiveMetrics', handler)
+ * - 2.x:  $.connection.metricsHub.client.receiveMetrics = handler
+ * - Core: await connection.start()
+ * - 2.x:  $.connection.hub.start().done(callback)
+ * - Core: await connection.invoke('WakeUp')
+ * - 2.x:  $.connection.metricsHub.server.wakeUp()
  */
-async function initializeSignalR() {
-    state.connection = new signalR.HubConnectionBuilder()
-        .withUrl('/hubs/metrics')
-        .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry with backoff
-        .configureLogging(signalR.LogLevel.Information)
-        .build();
-
-    // Configure timeouts to detect server unresponsiveness faster
-    // serverTimeoutInMilliseconds: How long client waits for server response before disconnecting
-    // Must be at least 2x the server's KeepAliveInterval (15s), so we use 45s
-    state.connection.serverTimeoutInMilliseconds = 45000;
+function initializeSignalR() {
+    // Get the hub proxy
+    var hub = $.connection.metricsHub;
     
-    // keepAliveIntervalInMilliseconds: How often client sends ping to server
-    state.connection.keepAliveIntervalInMilliseconds = 15000;
+    if (!hub) {
+        console.error('MetricsHub proxy not found. Make sure /signalr/hubs is loaded.');
+        setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
+        return;
+    }
 
+    // Register message handlers on the client proxy
+    // SignalR 2.x uses client object for server-to-client methods
+    hub.client.receiveMetrics = handleMetricsUpdate;
+    hub.client.simulationStarted = handleSimulationStarted;
+    hub.client.simulationCompleted = handleSimulationCompleted;
+    hub.client.receiveLatency = handleLatencyUpdate;
+    hub.client.receiveSlowRequestLatency = handleSlowRequestLatency;
+    hub.client.receiveLoadTestStats = handleLoadTestStats;
+    hub.client.receiveIdleState = handleIdleState;
+
+    // Configure connection
+    $.connection.hub.logging = true;
+    
     // Handle connection state changes
-    state.connection.onreconnecting(error => {
-        updateConnectionStatus('connecting', 'Reconnecting...');
-        logEvent('system', 'Connection lost. Attempting to reconnect...');
-    });
-
-    state.connection.onreconnected(async connectionId => {
-        updateConnectionStatus('connected', 'Connected');
-        logEvent('system', 'Reconnected to server');
+    $.connection.hub.stateChanged(function (change) {
+        var connectionStates = {
+            0: 'connecting',
+            1: 'connected',
+            2: 'reconnecting',
+            4: 'disconnected'
+        };
         
-        // NOTE: We do NOT wake the server on reconnect. Only page loads should wake the app.
-        // This prevents SignalR auto-reconnects (from network hiccups or keepalives) from
-        // waking the app when the user isn't actually interacting with the dashboard.
+        if (change.newState === $.signalR.connectionState.reconnecting) {
+            updateConnectionStatus('connecting', 'Reconnecting...');
+            logEvent('system', 'Connection lost. Attempting to reconnect...');
+        } else if (change.newState === $.signalR.connectionState.connected) {
+            updateConnectionStatus('connected', 'Connected');
+            if (change.oldState === $.signalR.connectionState.reconnecting) {
+                logEvent('system', 'Reconnected to server');
+            }
+        }
     });
 
-    state.connection.onclose(error => {
+    $.connection.hub.disconnected(function () {
         updateConnectionStatus('disconnected', 'Disconnected');
         logEvent('system', 'Connection closed. Attempting to reconnect...');
-        // Auto-reconnect after close (handles cases where withAutomaticReconnect gives up)
+        // Auto-reconnect after close
         setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
     });
 
-    // Register message handlers
-    // Note: SignalR uses camelCase for method names by default
-    state.connection.on('ReceiveMetrics', handleMetricsUpdate);
-    state.connection.on('receiveMetrics', handleMetricsUpdate);
-    state.connection.on('SimulationStarted', handleSimulationStarted);
-    state.connection.on('simulationStarted', handleSimulationStarted);
-    state.connection.on('SimulationCompleted', handleSimulationCompleted);
-    state.connection.on('simulationCompleted', handleSimulationCompleted);
-    state.connection.on('ReceiveLatency', handleLatencyUpdate);
-    state.connection.on('receiveLatency', handleLatencyUpdate);
-    state.connection.on('ReceiveSlowRequestLatency', handleSlowRequestLatency);
-    state.connection.on('receiveSlowRequestLatency', handleSlowRequestLatency);
-    state.connection.on('ReceiveLoadTestStats', handleLoadTestStats);
-    state.connection.on('receiveLoadTestStats', handleLoadTestStats);
-    state.connection.on('ReceiveIdleState', handleIdleState);
-    state.connection.on('receiveIdleState', handleIdleState);
+    $.connection.hub.error(function (error) {
+        console.error('SignalR error:', error);
+        logEvent('system', 'SignalR error: ' + (error.message || error));
+    });
+
+    // Hub URL is already set by auto-generated proxy from /hubs/metrics/signalr/hubs
 
     // Start connection
-    try {
-        updateConnectionStatus('connecting', 'Connecting...');
-        await state.connection.start();
-        updateConnectionStatus('connected', 'Connected');
-        logEvent('system', 'Connected to metrics hub');
-        
-        // Wake up the server on initial page load (not on auto-reconnects)
-        // This is the ONLY place that should wake the app from idle state
-        try {
-            await state.connection.invoke('WakeUp');
-        } catch (err) {
-            console.warn('Failed to invoke WakeUp on initial connect:', err);
-        }
-    } catch (err) {
-        updateConnectionStatus('disconnected', 'Failed to connect');
-        logEvent('system', `Connection failed: ${err.message}`);
-        // Try again after delay
-        setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
-    }
+    updateConnectionStatus('connecting', 'Connecting...');
+    $.connection.hub.start()
+        .done(function () {
+            updateConnectionStatus('connected', 'Connected');
+            logEvent('system', 'Connected to metrics hub');
+            state.connection = hub;
+            
+            // Wake up the server on initial page load
+            try {
+                hub.server.wakeUp();
+            } catch (err) {
+                console.warn('Failed to invoke WakeUp on initial connect:', err);
+            }
+        })
+        .fail(function (err) {
+            updateConnectionStatus('disconnected', 'Failed to connect');
+            logEvent('system', 'Connection failed: ' + (err.message || err));
+            // Try again after delay
+            setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
+        });
 }
 
 function updateConnectionStatus(status, text) {

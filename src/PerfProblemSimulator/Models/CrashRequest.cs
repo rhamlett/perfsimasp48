@@ -1,8 +1,8 @@
-namespace PerfProblemSimulator.Models;
-
-/// <summary>
-/// Request model for triggering application crashes.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Request model for triggering application crashes.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> This request triggers intentional application crashes
@@ -33,7 +33,7 @@ public class CrashRequest
     /// <summary>
     /// Custom message to include in the crash (for FailFast and UnhandledException types).
     /// </summary>
-    public string? Message { get; set; }
+    public string Message { get; set; }
 
     /// <summary>
     /// If true, crash happens during the HTTP request (no response sent).
@@ -85,4 +85,5 @@ public enum CrashType
     /// Different from memory pressure - this is meant to be fatal.
     /// </summary>
     OutOfMemory = 4
+    }
 }

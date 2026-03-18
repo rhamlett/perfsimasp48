@@ -379,7 +379,7 @@ az webapp create \
   --name your-unique-app-name \
   --resource-group rg-perf-simulator \
   --plan asp-perf-simulator \
-  --runtime "DOTNETCORE:10.0"
+  --runtime "DOTNETFRAMEWORK:v4.8"
 
 # Deploy
 cd src/PerfProblemSimulator
@@ -387,7 +387,7 @@ dotnet publish -c Release
 az webapp deploy \
   --resource-group rg-perf-simulator \
   --name your-unique-app-name \
-  --src-path bin/Release/net10.0/publish
+  --src-path bin/Release
 ```
 
 ## 🔍 Using Azure Diagnostics
@@ -473,4 +473,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Designed for educational use in Azure App Service training
 - Inspired by common performance anti-patterns encountered in production
-- Built with .NET 10.0 and ASP.NET Core
+- Built with ASP.NET Framework 4.8

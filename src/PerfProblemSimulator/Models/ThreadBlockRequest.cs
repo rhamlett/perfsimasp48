@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PerfProblemSimulator.Models;
-
-/// <summary>
-/// Request model for triggering sync-over-async thread pool starvation.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Request model for triggering sync-over-async thread pool starvation.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> Sync-over-async is one of the most common and
@@ -42,4 +42,5 @@ public class ThreadBlockRequest
     /// </remarks>
     [Range(1, int.MaxValue, ErrorMessage = "Concurrent requests must be at least 1")]
     public int ConcurrentRequests { get; set; } = 10;
+}
 }

@@ -1,10 +1,10 @@
 using PerfProblemSimulator.Models;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Interface for the memory pressure service that allocates and releases memory.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Interface for the memory pressure service that allocates and releases memory.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> This service demonstrates memory management
@@ -54,4 +54,5 @@ public interface IMemoryPressureService
     /// Current allocation statistics.
     /// </returns>
     MemoryStatus GetMemoryStatus();
+    }
 }

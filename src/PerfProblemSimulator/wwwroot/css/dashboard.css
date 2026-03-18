@@ -3,25 +3,25 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   CSS Variables / Theme
+   CSS Variables / Theme - .NET Framework Purple Palette
    -------------------------------------------------------------------------- */
 :root {
-    --color-primary: #006cbf;
-    --color-primary-dark: #00518e;
+    --color-primary: #68217A;
+    --color-primary-dark: #512BD4;
     --color-success: #107c10;
     --color-warning: #ffb900;
     --color-danger: #d13438;
     --color-secondary: #6c757d;
     
-    --color-bg: #f5f8fb;
-    --color-bg-tint-faint: #ebf2f8;
-    --color-bg-tint-neutral: #f2f6fa;
-    --color-bg-tint-saturated: #d9e8f4;
+    --color-bg: #f8f5fa;
+    --color-bg-tint-faint: #f3eff5;
+    --color-bg-tint-neutral: #f5f2f8;
+    --color-bg-tint-saturated: #e8dff0;
     --color-card: #ffffff;
     --color-text: #323130;
     --color-text-muted: #605e5c;
     
-    --color-cpu: #0078d4;
+    --color-cpu: #68217A;
     --color-memory: #107c10;
     --color-threads: #8764b8;
     --color-queue: #ffb900;

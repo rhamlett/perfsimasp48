@@ -1,8 +1,10 @@
-namespace PerfProblemSimulator.Services;
+using System;
 
-/// <summary>
-/// Interface for managing application idle state to reduce unnecessary network traffic.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Interface for managing application idle state to reduce unnecessary network traffic.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -27,24 +29,24 @@ namespace PerfProblemSimulator.Services;
 /// </para>
 /// </remarks>
 public interface IIdleStateService
-{
-    /// <summary>
-    /// Event raised when the application transitions to idle state.
-    /// </summary>
-    event EventHandler? GoingIdle;
+    {
+        /// <summary>
+        /// Event raised when the application transitions to idle state.
+        /// </summary>
+        event EventHandler GoingIdle;
 
-    /// <summary>
-    /// Event raised when the application wakes up from idle state.
-    /// </summary>
-    event EventHandler? WakingUp;
+        /// <summary>
+        /// Event raised when the application wakes up from idle state.
+        /// </summary>
+        event EventHandler WakingUp;
 
-    /// <summary>
-    /// Gets whether the application is currently in idle state.
-    /// </summary>
-    bool IsIdle { get; }
+        /// <summary>
+        /// Gets whether the application is currently in idle state.
+        /// </summary>
+        bool IsIdle { get; }
 
-    /// <summary>
-    /// Gets the configured idle timeout in minutes.
+        /// <summary>
+        /// Gets the configured idle timeout in minutes.
     /// </summary>
     int IdleTimeoutMinutes { get; }
 
@@ -59,4 +61,5 @@ public interface IIdleStateService
     /// </summary>
     /// <returns>True if the application was idle and is now awake, false if already active.</returns>
     bool WakeUp();
+    }
 }

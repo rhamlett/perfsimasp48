@@ -1,9 +1,12 @@
-namespace PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 
-/// <summary>
-/// Standard error response format for all API endpoints.
-/// Provides structured error information including validation details.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Standard error response format for all API endpoints.
+    /// Provides structured error information including validation details.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> Consistent error responses make it easier to build
@@ -26,12 +29,12 @@ public class ErrorResponse
     /// <item><term>INTERNAL_ERROR</term><description>Unexpected server error</description></item>
     /// </list>
     /// </remarks>
-    public required string Error { get; init; }
+    public string Error { get; set; }
 
     /// <summary>
     /// Human-readable error message.
     /// </summary>
-    public required string Message { get; init; }
+    public string Message { get; set; }
 
     /// <summary>
     /// Field-level validation errors.
@@ -43,12 +46,12 @@ public class ErrorResponse
     /// this might contain: <c>{ "DurationSeconds": ["Value must be between 1 and 300 seconds"] }</c>
     /// </para>
     /// </remarks>
-    public Dictionary<string, string[]>? Details { get; init; }
+    public Dictionary<string, string[]> Details { get; set; }
 
     /// <summary>
     /// When this error occurred.
     /// </summary>
-    public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
     /// Creates a validation error response.
@@ -56,7 +59,7 @@ public class ErrorResponse
     /// <param name="message">The error message.</param>
     /// <param name="details">Optional field-level validation errors.</param>
     /// <returns>An ErrorResponse configured as a validation error.</returns>
-    public static ErrorResponse ValidationError(string message, Dictionary<string, string[]>? details = null)
+    public static ErrorResponse ValidationError(string message, Dictionary<string, string[]> details = null)
     {
         return new ErrorResponse
         {
@@ -106,4 +109,5 @@ public class ErrorResponse
             Message = message
         };
     }
+}
 }

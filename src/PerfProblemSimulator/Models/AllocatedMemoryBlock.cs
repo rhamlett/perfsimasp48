@@ -1,8 +1,10 @@
-namespace PerfProblemSimulator.Models;
+using System;
 
-/// <summary>
-/// Represents a block of memory intentionally held by the application.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Represents a block of memory intentionally held by the application.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> This class demonstrates how memory can be
@@ -21,32 +23,33 @@ namespace PerfProblemSimulator.Models;
 /// </remarks>
 public class AllocatedMemoryBlock
 {
-    /// <summary>
-    /// Unique identifier for tracking this block.
-    /// </summary>
-    public Guid Id { get; init; }
+        /// <summary>
+        /// Unique identifier for tracking this block.
+        /// </summary>
+        public Guid Id { get; set; }
 
-    /// <summary>
-    /// Actual size of the allocated memory in bytes.
-    /// </summary>
-    public long SizeBytes { get; init; }
+        /// <summary>
+        /// Actual size of the allocated memory in bytes.
+        /// </summary>
+        public long SizeBytes { get; set; }
 
-    /// <summary>
-    /// When this block was allocated.
-    /// </summary>
-    public DateTimeOffset AllocatedAt { get; init; }
+        /// <summary>
+        /// When this block was allocated.
+        /// </summary>
+        public DateTimeOffset AllocatedAt { get; set; }
 
-    /// <summary>
-    /// The actual allocated memory data.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <strong>⚠️ INTENTIONALLY BAD CODE ⚠️</strong>
-    /// </para>
-    /// <para>
-    /// Keeping a reference to this large byte array prevents the garbage collector
-    /// from reclaiming it. This is the core mechanism of the memory pressure simulation.
-    /// </para>
-    /// </remarks>
-    public byte[] Data { get; init; } = [];
+        /// <summary>
+        /// The actual allocated memory data.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <strong>⚠️ INTENTIONALLY BAD CODE ⚠️</strong>
+        /// </para>
+        /// <para>
+        /// Keeping a reference to this large byte array prevents the garbage collector
+        /// from reclaiming it. This is the core mechanism of the memory pressure simulation.
+        /// </para>
+        /// </remarks>
+        public byte[] Data { get; set; } = new byte[0];
+    }
 }

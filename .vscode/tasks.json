@@ -24,6 +24,17 @@
                 "${workspaceFolder}/src/PerfProblemSimulator/PerfProblemSimulator.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "run",
+            "type": "shell",
+            "command": "${workspaceFolder}/src/PerfProblemSimulator/bin/Debug/PerfProblemSimulator.exe",
+            "dependsOn": "build",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
         }
     ]
 }

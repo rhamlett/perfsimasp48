@@ -23,7 +23,7 @@
   ============================================================================
 -->
 
-# NETCoreApp Constitution
+# Performance Problem Simulator Constitution
 
 ## Core Principles
 

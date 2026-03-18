@@ -1,10 +1,12 @@
 using PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Service interface for simulating slow HTTP requests that cause thread pool starvation.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Service interface for simulating slow HTTP requests that cause thread pool starvation.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -84,5 +86,6 @@ public class SlowRequestStatus
     public int IntervalSeconds { get; set; }
     public int RequestDurationSeconds { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
-    public Dictionary<string, int> ScenarioCounts { get; set; } = new();
+        public Dictionary<string, int> ScenarioCounts { get; set; } = new Dictionary<string, int>();
+    }
 }

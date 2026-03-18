@@ -1,9 +1,12 @@
-namespace PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 
-/// <summary>
-/// Represents the result of triggering a performance problem simulation.
-/// Returned by all simulation trigger endpoints.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Represents the result of triggering a performance problem simulation.
+    /// Returned by all simulation trigger endpoints.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> This response model provides comprehensive information
@@ -21,12 +24,12 @@ public class SimulationResult
     /// Unique identifier for tracking this simulation instance.
     /// Use this ID to correlate metrics and logs with the specific simulation.
     /// </summary>
-    public Guid SimulationId { get; init; }
+    public Guid SimulationId { get; set; }
 
     /// <summary>
     /// The type of performance problem that was triggered.
     /// </summary>
-    public SimulationType Type { get; init; }
+    public SimulationType Type { get; set; }
 
     /// <summary>
     /// Current status of the simulation.
@@ -40,13 +43,13 @@ public class SimulationResult
     /// <item><term>Cancelled</term><description>Simulation was cancelled before completion</description></item>
     /// </list>
     /// </remarks>
-    public required string Status { get; init; }
+    public string Status { get; set; }
 
     /// <summary>
     /// Human-readable description of what happened or is happening.
     /// Provides educational context about the simulation.
     /// </summary>
-    public required string Message { get; init; }
+    public string Message { get; set; }
 
     /// <summary>
     /// The actual parameters used for the simulation.
@@ -65,16 +68,17 @@ public class SimulationResult
     /// <item><term>ThreadBlock</term><description>DelayMilliseconds, ConcurrentRequests</description></item>
     /// </list>
     /// </remarks>
-    public Dictionary<string, object>? ActualParameters { get; init; }
+    public Dictionary<string, object> ActualParameters { get; set; }
 
     /// <summary>
     /// When this simulation started.
     /// </summary>
-    public DateTimeOffset StartedAt { get; init; }
+    public DateTimeOffset StartedAt { get; set; }
 
     /// <summary>
     /// When this simulation is expected to complete.
     /// Null for simulations with no defined end (e.g., memory allocation holds until released).
     /// </summary>
-    public DateTimeOffset? EstimatedEndAt { get; init; }
+    public DateTimeOffset? EstimatedEndAt { get; set; }
+}
 }

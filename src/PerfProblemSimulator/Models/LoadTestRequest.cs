@@ -28,7 +28,8 @@
  * =============================================================================
  */
 
-namespace PerfProblemSimulator.Models;
+namespace PerfProblemSimulator.Models
+{
 
 /// <summary>
 /// Request parameters for load test endpoint.
@@ -273,4 +274,5 @@ public class LoadTestRequest
     /// </para>
     /// </remarks>
     public int ErrorPercent { get; set; } = 20;
+}
 }

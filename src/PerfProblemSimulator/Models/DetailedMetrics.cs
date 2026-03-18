@@ -1,8 +1,11 @@
-namespace PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 
-/// <summary>
-/// Detailed CPU metrics for the health status endpoint.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Detailed CPU metrics for the health status endpoint.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -24,12 +27,12 @@ public class CpuMetrics
     /// <summary>
     /// Current CPU usage percentage (0-100).
     /// </summary>
-    public double UsagePercent { get; init; }
+    public double UsagePercent { get; set; }
 
     /// <summary>
     /// Number of logical processors available.
     /// </summary>
-    public int ProcessorCount { get; init; }
+    public int ProcessorCount { get; set; }
 }
 
 /// <summary>
@@ -40,22 +43,22 @@ public class MemoryMetrics
     /// <summary>
     /// Process working set in bytes.
     /// </summary>
-    public long WorkingSetBytes { get; init; }
+    public long WorkingSetBytes { get; set; }
 
     /// <summary>
     /// Managed GC heap size in bytes.
     /// </summary>
-    public long GcHeapBytes { get; init; }
+    public long GcHeapBytes { get; set; }
 
     /// <summary>
     /// Number of intentionally allocated memory blocks.
     /// </summary>
-    public int AllocatedBlocksCount { get; init; }
+    public int AllocatedBlocksCount { get; set; }
 
     /// <summary>
     /// Total size of intentionally allocated blocks in bytes.
     /// </summary>
-    public long AllocatedBlocksTotalBytes { get; init; }
+    public long AllocatedBlocksTotalBytes { get; set; }
 }
 
 /// <summary>
@@ -66,37 +69,37 @@ public class ThreadPoolMetrics
     /// <summary>
     /// Current number of thread pool threads.
     /// </summary>
-    public int ThreadCount { get; init; }
+    public int ThreadCount { get; set; }
 
     /// <summary>
     /// Number of work items waiting in the thread pool queue.
     /// </summary>
-    public long PendingWorkItems { get; init; }
+    public long PendingWorkItems { get; set; }
 
     /// <summary>
     /// Total work items completed since application start.
     /// </summary>
-    public long CompletedWorkItems { get; init; }
+    public long CompletedWorkItems { get; set; }
 
     /// <summary>
     /// Number of available worker threads.
     /// </summary>
-    public int AvailableWorkerThreads { get; init; }
+    public int AvailableWorkerThreads { get; set; }
 
     /// <summary>
     /// Maximum worker threads in the pool.
     /// </summary>
-    public int MaxWorkerThreads { get; init; }
+    public int MaxWorkerThreads { get; set; }
 
     /// <summary>
     /// Number of available I/O completion threads.
     /// </summary>
-    public int AvailableIoThreads { get; init; }
+    public int AvailableIoThreads { get; set; }
 
     /// <summary>
     /// Maximum I/O completion threads in the pool.
     /// </summary>
-    public int MaxIoThreads { get; init; }
+    public int MaxIoThreads { get; set; }
 }
 
 /// <summary>
@@ -107,37 +110,37 @@ public class ApplicationHealthStatus
     /// <summary>
     /// When this status was captured.
     /// </summary>
-    public DateTimeOffset Timestamp { get; init; }
+    public DateTimeOffset Timestamp { get; set; }
 
     /// <summary>
     /// CPU-related metrics.
     /// </summary>
-    public CpuMetrics? Cpu { get; init; }
+    public CpuMetrics Cpu { get; set; }
 
     /// <summary>
     /// Memory-related metrics.
     /// </summary>
-    public MemoryMetrics? Memory { get; init; }
+    public MemoryMetrics Memory { get; set; }
 
     /// <summary>
     /// Thread pool statistics.
     /// </summary>
-    public ThreadPoolMetrics? ThreadPool { get; init; }
+    public ThreadPoolMetrics ThreadPool { get; set; }
 
     /// <summary>
     /// Summary of currently active simulations.
     /// </summary>
-    public List<SimulationSummary> ActiveSimulations { get; init; } = [];
+    public List<SimulationSummary> ActiveSimulations { get; set; } = new List<SimulationSummary>();
 
     /// <summary>
     /// Overall health assessment.
     /// </summary>
-    public bool IsHealthy { get; init; }
+    public bool IsHealthy { get; set; }
 
     /// <summary>
     /// Any warning messages about current state.
     /// </summary>
-    public List<string> Warnings { get; init; } = [];
+    public List<string> Warnings { get; set; } = new List<string>();
 }
 
 /// <summary>
@@ -148,20 +151,21 @@ public class SimulationSummary
     /// <summary>
     /// Simulation identifier.
     /// </summary>
-    public Guid Id { get; init; }
+    public Guid Id { get; set; }
 
     /// <summary>
     /// Type of simulation.
     /// </summary>
-    public SimulationType Type { get; init; }
+    public SimulationType Type { get; set; }
 
     /// <summary>
     /// When the simulation started.
     /// </summary>
-    public DateTimeOffset StartedAt { get; init; }
+    public DateTimeOffset StartedAt { get; set; }
 
     /// <summary>
     /// How long the simulation has been running.
     /// </summary>
-    public TimeSpan RunningDuration { get; init; }
+    public TimeSpan RunningDuration { get; set; }
+}
 }

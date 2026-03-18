@@ -1,10 +1,12 @@
 using PerfProblemSimulator.Models;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Interface for the thread blocking service that triggers sync-over-async starvation.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Interface for the thread blocking service that triggers sync-over-async starvation.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> This service demonstrates the sync-over-async
@@ -39,4 +41,5 @@ public interface IThreadBlockService
         int delayMilliseconds,
         int concurrentRequests,
         CancellationToken cancellationToken);
+    }
 }

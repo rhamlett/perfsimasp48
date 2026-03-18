@@ -1,22 +1,27 @@
+using NLog;
 using PerfProblemSimulator.Models;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Interface for tracking active simulations.
-/// </summary>
-public interface ISimulationTracker
+namespace PerfProblemSimulator.Services
 {
     /// <summary>
-    /// Event fired when a simulation is registered.
+    /// Interface for tracking active simulations.
     /// </summary>
-    event EventHandler<SimulationEventArgs>? SimulationStarted;
+    public interface ISimulationTracker
+    {
+        /// <summary>
+        /// Event fired when a simulation is registered.
+        /// </summary>
+        event EventHandler<SimulationEventArgs> SimulationStarted;
 
-    /// <summary>
-    /// Event fired when a simulation is unregistered (completed or cancelled).
-    /// </summary>
-    event EventHandler<SimulationEventArgs>? SimulationCompleted;
+        /// <summary>
+        /// Event fired when a simulation is unregistered (completed or cancelled).
+        /// </summary>
+        event EventHandler<SimulationEventArgs> SimulationCompleted;
 
     /// <summary>
     /// Registers a new active simulation.
@@ -75,7 +80,7 @@ public interface ISimulationTracker
     /// <param name="simulationId">The simulation ID to look up.</param>
     /// <param name="info">The simulation info if found.</param>
     /// <returns>True if the simulation was found, false otherwise.</returns>
-    bool TryGetSimulation(Guid simulationId, out ActiveSimulationInfo? info);
+    bool TryGetSimulation(Guid simulationId, out ActiveSimulationInfo info);
 }
 
 /// <summary>
@@ -111,28 +116,28 @@ public class SimulationEventArgs : EventArgs
 /// includes the <see cref="CancellationTokenSource"/> which is not exposed
 /// to prevent external manipulation.
 /// </remarks>
-public class ActiveSimulationInfo
-{
-    /// <summary>
-    /// Unique identifier for the simulation.
-    /// </summary>
-    public required Guid Id { get; init; }
+    public class ActiveSimulationInfo
+    {
+        /// <summary>
+        /// Unique identifier for the simulation.
+        /// </summary>
+        public Guid Id { get; set; }
 
-    /// <summary>
-    /// Type of simulation.
-    /// </summary>
-    public required SimulationType Type { get; init; }
+        /// <summary>
+        /// Type of simulation.
+        /// </summary>
+        public SimulationType Type { get; set; }
 
-    /// <summary>
-    /// When the simulation started.
-    /// </summary>
-    public required DateTimeOffset StartedAt { get; init; }
+        /// <summary>
+        /// When the simulation started.
+        /// </summary>
+        public DateTimeOffset StartedAt { get; set; }
 
-    /// <summary>
-    /// Parameters used for the simulation.
-    /// </summary>
-    public required IReadOnlyDictionary<string, object> Parameters { get; init; }
-}
+        /// <summary>
+        /// Parameters used for the simulation.
+        /// </summary>
+        public IReadOnlyDictionary<string, object> Parameters { get; set; }
+    }
 
 /// <summary>
 /// Thread-safe registry for tracking all active performance simulations.
@@ -181,32 +186,37 @@ public class ActiveSimulationInfo
 /// </list>
 /// </para>
 /// </remarks>
-public class SimulationTracker : ISimulationTracker
-{
-    private readonly ConcurrentDictionary<Guid, TrackedSimulation> _simulations = new();
-    private readonly ILogger<SimulationTracker> _logger;
-
-    /// <inheritdoc />
-    public event EventHandler<SimulationEventArgs>? SimulationStarted;
-
-    /// <inheritdoc />
-    public event EventHandler<SimulationEventArgs>? SimulationCompleted;
-
-    /// <summary>
-    /// Internal tracking record that includes the cancellation source.
-    /// </summary>
-    private record TrackedSimulation(
-        ActiveSimulationInfo Info,
-        CancellationTokenSource CancellationSource);
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="SimulationTracker"/> class.
-    /// </summary>
-    /// <param name="logger">Logger for recording simulation lifecycle events.</param>
-    public SimulationTracker(ILogger<SimulationTracker> logger)
+    public class SimulationTracker : ISimulationTracker
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+        private readonly ConcurrentDictionary<Guid, TrackedSimulation> _simulations = new ConcurrentDictionary<Guid, TrackedSimulation>();
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        /// <inheritdoc />
+        public event EventHandler<SimulationEventArgs> SimulationStarted;
+
+        /// <inheritdoc />
+        public event EventHandler<SimulationEventArgs> SimulationCompleted;
+
+        /// <summary>
+        /// Internal tracking class that includes the cancellation source.
+        /// </summary>
+        private class TrackedSimulation
+        {
+            public TrackedSimulation(ActiveSimulationInfo info, CancellationTokenSource cancellationSource)
+            {
+                Info = info;
+                CancellationSource = cancellationSource;
+            }
+            public ActiveSimulationInfo Info { get; }
+            public CancellationTokenSource CancellationSource { get; }
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SimulationTracker"/> class.
+        /// </summary>
+        public SimulationTracker()
+        {
+        }
 
     /// <inheritdoc />
     public void RegisterSimulation(
@@ -214,52 +224,54 @@ public class SimulationTracker : ISimulationTracker
         SimulationType type,
         Dictionary<string, object> parameters,
         CancellationTokenSource cancellationSource)
-    {
-        ArgumentNullException.ThrowIfNull(parameters);
-        ArgumentNullException.ThrowIfNull(cancellationSource);
-
-        var info = new ActiveSimulationInfo
         {
-            Id = simulationId,
-            Type = type,
-            StartedAt = DateTimeOffset.UtcNow,
-            Parameters = parameters.AsReadOnly()
-        };
+            if (parameters == null) throw new ArgumentNullException(nameof(parameters));
+            if (cancellationSource == null) throw new ArgumentNullException(nameof(cancellationSource));
 
-        var tracked = new TrackedSimulation(info, cancellationSource);
+            var info = new ActiveSimulationInfo
+            {
+                Id = simulationId,
+                Type = type,
+                StartedAt = DateTimeOffset.UtcNow,
+                Parameters = new System.Collections.ObjectModel.ReadOnlyDictionary<string, object>(parameters)
+            };
 
-        if (_simulations.TryAdd(simulationId, tracked))
-        {
-            _logger.LogInformation(
-                "Registered {SimulationType} simulation {SimulationId} with parameters: {@Parameters}",
-                type,
-                simulationId,
-                parameters);
+            var tracked = new TrackedSimulation(info, cancellationSource);
 
-            // Fire the SimulationStarted event
-            SimulationStarted?.Invoke(this, new SimulationEventArgs(simulationId, type));
+            if (_simulations.TryAdd(simulationId, tracked))
+            {
+                Logger.Info(
+                    "Registered {0} simulation {1} with parameters",
+                    type,
+                    simulationId);
+
+                // Fire the SimulationStarted event
+                var handler = SimulationStarted;
+                if (handler != null) handler(this, new SimulationEventArgs(simulationId, type));
+            }
+            else
+            {
+                Logger.Warn(
+                    "Failed to register simulation {0} - ID already exists",
+                    simulationId);
+            }
         }
-        else
-        {
-            _logger.LogWarning(
-                "Failed to register simulation {SimulationId} - ID already exists",
-                simulationId);
-        }
-    }
 
     /// <inheritdoc />
-    public bool UnregisterSimulation(Guid simulationId)
-    {
-        if (_simulations.TryRemove(simulationId, out var tracked))
+        public bool UnregisterSimulation(Guid simulationId)
         {
-            _logger.LogInformation(
-                "Unregistered {SimulationType} simulation {SimulationId} (ran for {Duration})",
-                tracked.Info.Type,
-                simulationId,
-                DateTimeOffset.UtcNow - tracked.Info.StartedAt);
+            TrackedSimulation tracked;
+            if (_simulations.TryRemove(simulationId, out tracked))
+            {
+                Logger.Info(
+                    "Unregistered {0} simulation {1} (ran for {2})",
+                    tracked.Info.Type,
+                    simulationId,
+                    DateTimeOffset.UtcNow - tracked.Info.StartedAt);
 
-            // Fire the SimulationCompleted event
-            SimulationCompleted?.Invoke(this, new SimulationEventArgs(simulationId, tracked.Info.Type));
+                // Fire the SimulationCompleted event
+                var handler = SimulationCompleted;
+                if (handler != null) handler(this, new SimulationEventArgs(simulationId, tracked.Info.Type));
 
             return true;
         }
@@ -301,7 +313,7 @@ public class SimulationTracker : ISimulationTracker
             }
         }
 
-        _logger.LogInformation("Cancelled {Count} active simulations", cancelled);
+        Logger.Info("Cancelled {0} active simulations", cancelled);
 
         // Clear all simulations after cancellation
         _simulations.Clear();
@@ -336,24 +348,28 @@ public class SimulationTracker : ISimulationTracker
         // Remove cancelled simulations
         foreach (var id in toRemove)
         {
-            _simulations.TryRemove(id, out _);
+            TrackedSimulation temp;
+            _simulations.TryRemove(id, out temp);
+            _ = temp; // Silence IDE warning - we don't need the removed value
         }
 
-        _logger.LogInformation("Cancelled {Count} {Type} simulations", cancelled, type);
+        Logger.Info("Cancelled {0} {1} simulations", cancelled, type);
 
         return cancelled;
     }
 
     /// <inheritdoc />
-    public bool TryGetSimulation(Guid simulationId, out ActiveSimulationInfo? info)
-    {
-        if (_simulations.TryGetValue(simulationId, out var tracked))
+        public bool TryGetSimulation(Guid simulationId, out ActiveSimulationInfo info)
         {
-            info = tracked.Info;
-            return true;
-        }
+            TrackedSimulation tracked;
+            if (_simulations.TryGetValue(simulationId, out tracked))
+            {
+                info = tracked.Info;
+                return true;
+            }
 
-        info = null;
-        return false;
+            info = null;
+            return false;
+        }
     }
 }

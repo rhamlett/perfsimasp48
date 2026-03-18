@@ -1,0 +1,51 @@
+# EditorConfig for Performance Problem Simulator
+# This file configures IDE analyzers to suppress intentional patterns
+
+root = true
+
+[*.cs]
+# Suppress "Namespace does not correspond to file location" for App_Start folder
+# This is a standard ASP.NET Framework convention
+dotnet_diagnostic.IDE0130.severity = none
+
+# Suppress "Field is never used" - Logger fields are common to have ready
+dotnet_diagnostic.IDE0051.severity = none
+
+# Suppress "Field is assigned but never used" - some fields are for side effects (Timer references)
+dotnet_diagnostic.IDE0052.severity = none
+
+# Suppress "Remove redundant catch clause" - some are intentional patterns
+dotnet_diagnostic.RCS1075.severity = none
+
+# Suppress "Method is recursive on all paths" - CrashService intentionally causes stack overflow
+dotnet_diagnostic.RCS1249.severity = none
+
+# Suppress "Empty catch clause" - intentional fire-and-forget patterns
+dotnet_diagnostic.RCS1074.severity = none
+
+# Suppress "Parameter is never used" - Unity DI lambda patterns
+dotnet_diagnostic.IDE0060.severity = none
+
+# Suppress "Empty constructor is redundant"
+dotnet_diagnostic.RCS1142.severity = none
+
+# ReSharper inspections
+resharper_redundant_catch_clause_highlighting = none
+resharper_function_recursive_on_all_paths_highlighting = none
+resharper_inconsistent_naming_highlighting = none
+resharper_unused_member_global_highlighting = none
+resharper_unused_member_in_super_global_scope_highlighting = none
+resharper_member_can_be_private_global_highlighting = none
+resharper_check_namespace_highlighting = none
+
+# Naming style enforcement disabled - mixed codebase
+dotnet_naming_rule.private_static_readonly_fields_should_be_pascal_case.severity = none
+dotnet_naming_rule.private_constants_should_be_pascal_case.severity = none
+dotnet_naming_rule.local_constants_should_be_camel_case.severity = none
+
+# Code style preferences
+indent_style = space
+indent_size = 4
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true

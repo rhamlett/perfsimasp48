@@ -23,12 +23,14 @@
  */
 
 using PerfProblemSimulator.Models;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Interface for the load test service that handles request work simulation.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Interface for the load test service that handles request work simulation.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>IMPLEMENTATION NOTES:</strong>
@@ -114,35 +116,41 @@ public interface ILoadTestService
     /// Gets current load test statistics without performing any work.
     /// </summary>
     /// <returns>Current statistics including concurrent request count.</returns>
-    LoadTestStats GetCurrentStats();
+        LoadTestStats GetCurrentStats();
+    }
+
+    /*
+     * =============================================================================
+     * STATISTICS RECORD
+     * =============================================================================
+     * 
+     * C# RECORDS:
+     * A "record" is an immutable data class with value-based equality.
+     * Think of it as a simple data container.
+     * 
+     * PORTING:
+     * - PHP: class LoadTestStats { public int $currentConcurrentRequests; ... }
+     * - Node.js: { currentConcurrentRequests: number, ... } (plain object or class)
+     * - Java: record LoadTestStats(int currentConcurrentRequests, ...) {} or POJO
+     * - Python: @dataclass class LoadTestStats: current_concurrent_requests: int
+     */
+
+    /// <summary>
+    /// Current statistics for the load test service.
+    /// </summary>
+    public class LoadTestStats
+    {
+        public LoadTestStats(int currentConcurrentRequests, long totalRequestsProcessed, long totalExceptionsThrown, double averageResponseTimeMs)
+        {
+            CurrentConcurrentRequests = currentConcurrentRequests;
+            TotalRequestsProcessed = totalRequestsProcessed;
+            TotalExceptionsThrown = totalExceptionsThrown;
+            AverageResponseTimeMs = averageResponseTimeMs;
+        }
+
+        public int CurrentConcurrentRequests { get; }
+        public long TotalRequestsProcessed { get; }
+        public long TotalExceptionsThrown { get; }
+        public double AverageResponseTimeMs { get; }
+    }
 }
-
-/*
- * =============================================================================
- * STATISTICS RECORD
- * =============================================================================
- * 
- * C# RECORDS:
- * A "record" is an immutable data class with value-based equality.
- * Think of it as a simple data container.
- * 
- * PORTING:
- * - PHP: class LoadTestStats { public int $currentConcurrentRequests; ... }
- * - Node.js: { currentConcurrentRequests: number, ... } (plain object or class)
- * - Java: record LoadTestStats(int currentConcurrentRequests, ...) {} or POJO
- * - Python: @dataclass class LoadTestStats: current_concurrent_requests: int
- */
-
-/// <summary>
-/// Current statistics for the load test service.
-/// </summary>
-/// <param name="CurrentConcurrentRequests">Number of requests currently being processed.</param>
-/// <param name="TotalRequestsProcessed">Total requests processed since app start.</param>
-/// <param name="TotalExceptionsThrown">Total random exceptions thrown (after 120s timeout).</param>
-/// <param name="AverageResponseTimeMs">Average response time in milliseconds.</param>
-public record LoadTestStats(
-    int CurrentConcurrentRequests,
-    long TotalRequestsProcessed,
-    long TotalExceptionsThrown,
-    double AverageResponseTimeMs
-);

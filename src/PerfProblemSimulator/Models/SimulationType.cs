@@ -1,9 +1,9 @@
-namespace PerfProblemSimulator.Models;
-
-/// <summary>
-/// Represents the type of performance problem being simulated.
-/// Each type corresponds to a different anti-pattern that causes specific performance issues.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Represents the type of performance problem being simulated.
+    /// Each type corresponds to a different anti-pattern that causes specific performance issues.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> These simulation types represent common performance anti-patterns
@@ -83,4 +83,5 @@ public enum SimulationType
     /// Diagnosis tools: AppLens, Application Insights failures blade, Azure Monitor alerts.
     /// </summary>
     FailedRequest
+}
 }

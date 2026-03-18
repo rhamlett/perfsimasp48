@@ -1,8 +1,8 @@
-namespace PerfProblemSimulator.Models;
-
-/// <summary>
-/// Application-wide configuration options loaded from appsettings.json or environment variables.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Application-wide configuration options loaded from appsettings.json or environment variables.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -66,4 +66,13 @@ public class ProblemSimulatorOptions
     /// </para>
     /// </remarks>
     public int LatencyProbeIntervalMs { get; set; } = 200;
+
+    /// <summary>
+    /// When true, disables all problem simulation endpoints.
+    /// </summary>
+    /// <remarks>
+    /// Can be configured via environment variable: <c>DISABLE_PROBLEM_ENDPOINTS</c>
+    /// </remarks>
+    public bool DisableProblemEndpoints { get; set; } = false;
+}
 }

@@ -48,280 +48,282 @@
  * =============================================================================
  */
 
-using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Http;
+using System.Web.Http.Description;
+using NLog;
 using PerfProblemSimulator.Models;
 using PerfProblemSimulator.Services;
 
-namespace PerfProblemSimulator.Controllers;
-
-/// <summary>
-/// Controller for load testing endpoint designed for Azure Load Testing integration.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <strong>LOAD TEST ENDPOINT</strong>
-/// </para>
-/// <para>
-/// This endpoint is designed to be targeted by Azure Load Testing or similar tools.
-/// Unlike other simulation endpoints, this one does NOT appear in the dashboard UI
-/// and is meant for automated load testing scenarios only.
-/// </para>
-/// <para>
-/// <strong>BEHAVIOR UNDER LOAD:</strong>
-/// <list type="bullet">
-/// <item><term>Low load (below soft limit)</term><description>~100ms response time</description></item>
-/// <item><term>Moderate load (at soft limit)</term><description>200-500ms as CPU contention builds</description></item>
-/// <item><term>High load (above soft limit)</term><description>Multi-second responses</description></item>
-/// <item><term>Extreme load</term><description>Responses approach 230s Azure timeout</description></item>
-/// </list>
-/// </para>
-/// <para>
-/// <strong>EXCEPTION BEHAVIOR:</strong>
-/// After a request has been processing for 120 seconds, there is a 20% chance per
-/// check interval that a random exception will be thrown. This simulates real-world
-/// application failures under extreme load.
-/// </para>
-/// </remarks>
-[ApiController]
-[Route("api/[controller]")]
-[Produces("application/json")]
-public class LoadTestController : ControllerBase
+namespace PerfProblemSimulator.Controllers
 {
-    /*
-     * =========================================================================
-     * DEPENDENCY INJECTION
-     * =========================================================================
-     * 
-     * CONCEPT: Constructor Injection
-     * The framework automatically provides instances of these services when
-     * creating the controller. This is called "Dependency Injection" (DI).
-     * 
-     * PORTING NOTES:
-     * - PHP (Laravel): Use constructor injection or app()->make()
-     * - Node.js: Pass dependencies to factory function or use DI container
-     * - Java (Spring): @Autowired or constructor injection
-     * - Python (FastAPI): Use Depends() for dependency injection
-     * 
-     * WHY THIS PATTERN:
-     * - Testability: Can inject mock services for unit testing
-     * - Loose coupling: Controller doesn't know how to create services
-     * - Configuration: Services can be configured at app startup
-     */
-    private readonly ILoadTestService _loadTestService;
-    private readonly ILogger<LoadTestController> _logger;
-
     /// <summary>
-    /// Initializes a new instance of the LoadTestController.
+    /// Controller for load testing endpoint designed for Azure Load Testing integration.
     /// </summary>
-    /// <param name="loadTestService">Service that performs the actual load test work.</param>
-    /// <param name="logger">Logger for request tracking and diagnostics.</param>
-    public LoadTestController(
-        ILoadTestService loadTestService,
-        ILogger<LoadTestController> logger)
-    {
-        // Null checks ensure required dependencies are provided
-        // PORTING: Most languages have similar null/undefined checks
-        _loadTestService = loadTestService ?? throw new ArgumentNullException(nameof(loadTestService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    /*
-     * =========================================================================
-     * ENDPOINT: POST /api/loadtest
-     * =========================================================================
-     * 
-     * HTTP METHOD CHOICE:
-     * Using POST because:
-     * 1. The operation performs work (not idempotent like GET)
-     * 2. Azure Load Testing can easily send POST with JSON body
-     * 3. Allows structured parameters in request body
-     * 
-     * ALTERNATIVE: GET with query parameters
-     * GET /api/loadtest?workIterations=200&bufferSizeKb=20000
-     * 
-     * URL PATTERN:
-     * The [controller] token is replaced with "loadtest" (class name minus "Controller")
-     * Full URL: GET https://your-app.azurewebsites.net/api/loadtest
-     */
-
-    /// <summary>
-    /// Executes a load test request with configurable resource consumption.
-    /// </summary>
-    /// <param name="workIterations">CPU work intensity (ms of spin per cycle = workIterations / 100). Default: 200.</param>
-    /// <param name="bufferSizeKb">Memory buffer held for request duration in KB. Default: 20000.</param>
-    /// <param name="baselineDelayMs">Minimum request duration in ms. Default: 500.</param>
-    /// <param name="softLimit">Concurrent requests before degradation begins. Default: 25.</param>
-    /// <param name="degradationFactor">Additional delay (ms) per request over soft limit. Default: 500.</param>
-    /// <param name="errorAfter">Seconds before random errors may be thrown. Default: 120. Set to 0 to disable.</param>
-    /// <param name="errorPercent">Percentage chance (0-100) of throwing a random error after errorAfter threshold. Default: 20.</param>
-    /// <param name="cancellationToken">Cancellation token from the HTTP request pipeline.</param>
-    /// <returns>Load test result with timing and diagnostic information.</returns>
     /// <remarks>
     /// <para>
-    /// <strong>ALGORITHM OVERVIEW:</strong>
+    /// <strong>LOAD TEST ENDPOINT</strong>
     /// </para>
     /// <para>
-    /// 1. Start a timer (Stopwatch)
-    /// 2. Apply baseline blocking delay (guarantees thread pool exhaustion)
-    /// 3. Check current concurrent request count
-    /// 4. If over soft limit, calculate and apply degradation delay
-    /// 5. Perform lightweight CPU work (hash iterations)
-    /// 6. Allocate memory buffer (released when request ends)
-    /// 7. Periodically check if elapsed time > errorAfter seconds; if so, errorPercent% chance of exception
-    /// 8. Return response with timing details
+    /// This endpoint is designed to be targeted by Azure Load Testing or similar tools.
+    /// Unlike other simulation endpoints, this one does NOT appear in the dashboard UI
+    /// and is meant for automated load testing scenarios only.
     /// </para>
     /// <para>
-    /// <strong>PARAMETERS:</strong>
-    /// </para>
+    /// <strong>BEHAVIOR UNDER LOAD:</strong>
     /// <list type="bullet">
-    /// <item>
-    /// <term>workIterations (default: 1000)</term>
-    /// <description>Number of SHA256 hash computations to perform. Higher = more CPU work.</description>
-    /// </item>
-    /// <item>
-    /// <term>bufferSizeKb (default: 100)</term>
-    /// <description>Size of memory buffer to allocate in kilobytes. Released after request.</description>
-    /// </item>
-    /// <item>
-    /// <term>baselineDelayMs (default: 500)</term>
-    /// <description>Minimum blocking delay applied to every request. Ensures thread pool exhaustion.</description>
-    /// </item>
-    /// <item>
-    /// <term>softLimit (default: 5)</term>
-    /// <description>Concurrent request count before degradation delays begin.</description>
-    /// </item>
-    /// <item>
-    /// <term>degradationFactor (default: 200)</term>
-    /// <description>Milliseconds of delay added per concurrent request over the soft limit.</description>
-    /// </item>
-    /// <item>
-    /// <term>errorAfter (default: 120)</term>
-    /// <description>Seconds before random errors may be thrown. Set to 0 to disable.</description>
-    /// </item>
-    /// <item>
-    /// <term>errorPercent (default: 20)</term>
-    /// <description>Percentage chance (0-100) of throwing a random error per check interval after threshold.</description>
-    /// </item>
+    /// <item><term>Low load (below soft limit)</term><description>~100ms response time</description></item>
+    /// <item><term>Moderate load (at soft limit)</term><description>200-500ms as CPU contention builds</description></item>
+    /// <item><term>High load (above soft limit)</term><description>Multi-second responses</description></item>
+    /// <item><term>Extreme load</term><description>Responses approach 230s Azure timeout</description></item>
     /// </list>
-    /// <para>
-    /// <strong>TOTAL DELAY FORMULA:</strong>
-    /// <code>
-    /// totalDelay = baselineDelayMs + max(0, currentConcurrent - softLimit) * degradationFactor
-    /// </code>
     /// </para>
     /// <para>
-    /// <strong>EXAMPLE SCENARIOS (with defaults baselineDelayMs=500, softLimit=5, factor=200):</strong>
+    /// <strong>EXCEPTION BEHAVIOR:</strong>
+    /// After a request has been processing for 120 seconds, there is a 20% chance per
+    /// check interval that a random exception will be thrown. This simulates real-world
+    /// application failures under extreme load.
     /// </para>
-    /// <list type="bullet">
-    /// <item>1 concurrent request → 500ms baseline only</item>
-    /// <item>10 concurrent requests → 500ms + (10-5)×200 = 1500ms total</item>
-    /// <item>20 concurrent requests → 500ms + (20-5)×200 = 3500ms total</item>
-    /// <item>50 concurrent requests → 500ms + (50-5)×200 = 9500ms total</item>
-    /// </list>
     /// </remarks>
-    /// <response code="200">Load test completed successfully with timing details.</response>
-    /// <response code="500">Request exceeded errorAfter threshold and random exception was triggered.</response>
-    [HttpGet]
-    [ProducesResponseType(typeof(LoadTestResult), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> ExecuteLoadTest(
-        [FromQuery] int workIterations = 200,
-        [FromQuery] int bufferSizeKb = 20000,
-        [FromQuery] int baselineDelayMs = 500,
-        [FromQuery] int softLimit = 25,
-        [FromQuery] int degradationFactor = 500,
-        [FromQuery] int errorAfter = 120,
-        [FromQuery] int errorPercent = 20,
-        CancellationToken cancellationToken = default)
+    [RoutePrefix("api/loadtest")]
+    public class LoadTestController : ApiController
     {
         /*
-         * =====================================================================
-         * QUERY PARAMETER ENDPOINT
-         * =====================================================================
+         * =========================================================================
+         * DEPENDENCY INJECTION
+         * =========================================================================
          * 
-         * GET /api/loadtest?workIterations=5000&bufferSizeKb=1000&baselineDelayMs=500
+         * CONCEPT: Constructor Injection
+         * The framework automatically provides instances of these services when
+         * creating the controller. This is called "Dependency Injection" (DI).
          * 
-         * Simple to use from:
-         * - Browser: just paste URL
-         * - curl: curl "http://localhost/api/loadtest?workIterations=5000"
-         * - Azure Load Testing: set URL directly
-         * - JMeter: HTTP Request sampler
+         * PORTING NOTES:
+         * - PHP (Laravel): Use constructor injection or app()->make()
+         * - Node.js: Pass dependencies to factory function or use DI container
+         * - Java (Spring): @Autowired or constructor injection
+         * - Python (FastAPI): Use Depends() for dependency injection
+         * 
+         * WHY THIS PATTERN:
+         * - Testability: Can inject mock services for unit testing
+         * - Loose coupling: Controller doesn't know how to create services
+         * - Configuration: Services can be configured at app startup
          */
-        
-        var request = new LoadTestRequest
-        {
-            WorkIterations = workIterations,
-            BufferSizeKb = bufferSizeKb,
-            BaselineDelayMs = baselineDelayMs,
-            SoftLimit = softLimit,
-            DegradationFactor = degradationFactor,
-            ErrorAfterSeconds = errorAfter,
-            ErrorPercent = errorPercent
-        };
-        
-        _logger.LogDebug(
-            "Load test: WorkIterations={WorkIterations}, BufferSizeKb={BufferSizeKb}, BaselineDelayMs={BaselineDelayMs}, SoftLimit={SoftLimit}, DegradationFactor={DegradationFactor}, ErrorAfter={ErrorAfter}s, ErrorPercent={ErrorPercent}%",
-            request.WorkIterations,
-            request.BufferSizeKb,
-            request.BaselineDelayMs,
-            request.SoftLimit,
-            request.DegradationFactor,
-            request.ErrorAfterSeconds,
-            request.ErrorPercent);
+        private readonly ILoadTestService _loadTestService;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        try
+        /// <summary>
+        /// Initializes a new instance of the LoadTestController.
+        /// </summary>
+        /// <param name="loadTestService">Service that performs the actual load test work.</param>
+        public LoadTestController(ILoadTestService loadTestService)
         {
-            var result = await _loadTestService.ExecuteWorkAsync(request, cancellationToken);
-            return Ok(result);
+            // Null checks ensure required dependencies are provided
+            // PORTING: Most languages have similar null/undefined checks
+            _loadTestService = loadTestService ?? throw new ArgumentNullException(nameof(loadTestService));
         }
-        catch (Exception ex)
+
+        /*
+         * =========================================================================
+         * ENDPOINT: POST /api/loadtest
+         * =========================================================================
+         * 
+         * HTTP METHOD CHOICE:
+         * Using POST because:
+         * 1. The operation performs work (not idempotent like GET)
+         * 2. Azure Load Testing can easily send POST with JSON body
+         * 3. Allows structured parameters in request body
+         * 
+         * ALTERNATIVE: GET with query parameters
+         * GET /api/loadtest?workIterations=200&bufferSizeKb=20000
+         * 
+         * URL PATTERN:
+         * The [controller] token is replaced with "loadtest" (class name minus "Controller")
+         * Full URL: GET https://your-app.azurewebsites.net/api/loadtest
+         */
+
+        /// <summary>
+        /// Executes a load test request with configurable resource consumption.
+        /// </summary>
+        /// <param name="workIterations">CPU work intensity (ms of spin per cycle = workIterations / 100). Default: 200.</param>
+        /// <param name="bufferSizeKb">Memory buffer held for request duration in KB. Default: 20000.</param>
+        /// <param name="baselineDelayMs">Minimum request duration in ms. Default: 500.</param>
+        /// <param name="softLimit">Concurrent requests before degradation begins. Default: 25.</param>
+        /// <param name="degradationFactor">Additional delay (ms) per request over soft limit. Default: 500.</param>
+        /// <param name="errorAfter">Seconds before random errors may be thrown. Default: 120. Set to 0 to disable.</param>
+        /// <param name="errorPercent">Percentage chance (0-100) of throwing a random error after errorAfter threshold. Default: 20.</param>
+        /// <param name="cancellationToken">Cancellation token from the HTTP request pipeline.</param>
+        /// <returns>Load test result with timing and diagnostic information.</returns>
+        /// <remarks>
+        /// <para>
+        /// <strong>ALGORITHM OVERVIEW:</strong>
+        /// </para>
+        /// <para>
+        /// 1. Start a timer (Stopwatch)
+        /// 2. Apply baseline blocking delay (guarantees thread pool exhaustion)
+        /// 3. Check current concurrent request count
+        /// 4. If over soft limit, calculate and apply degradation delay
+        /// 5. Perform lightweight CPU work (hash iterations)
+        /// 6. Allocate memory buffer (released when request ends)
+        /// 7. Periodically check if elapsed time > errorAfter seconds; if so, errorPercent% chance of exception
+        /// 8. Return response with timing details
+        /// </para>
+        /// <para>
+        /// <strong>PARAMETERS:</strong>
+        /// </para>
+        /// <list type="bullet">
+        /// <item>
+        /// <term>workIterations (default: 1000)</term>
+        /// <description>Number of SHA256 hash computations to perform. Higher = more CPU work.</description>
+        /// </item>
+        /// <item>
+        /// <term>bufferSizeKb (default: 100)</term>
+        /// <description>Size of memory buffer to allocate in kilobytes. Released after request.</description>
+        /// </item>
+        /// <item>
+        /// <term>baselineDelayMs (default: 500)</term>
+        /// <description>Minimum blocking delay applied to every request. Ensures thread pool exhaustion.</description>
+        /// </item>
+        /// <item>
+        /// <term>softLimit (default: 5)</term>
+        /// <description>Concurrent request count before degradation delays begin.</description>
+        /// </item>
+        /// <item>
+        /// <term>degradationFactor (default: 200)</term>
+        /// <description>Milliseconds of delay added per concurrent request over the soft limit.</description>
+        /// </item>
+        /// <item>
+        /// <term>errorAfter (default: 120)</term>
+        /// <description>Seconds before random errors may be thrown. Set to 0 to disable.</description>
+        /// </item>
+        /// <item>
+        /// <term>errorPercent (default: 20)</term>
+        /// <description>Percentage chance (0-100) of throwing a random error per check interval after threshold.</description>
+        /// </item>
+        /// </list>
+        /// <para>
+        /// <strong>TOTAL DELAY FORMULA:</strong>
+        /// <code>
+        /// totalDelay = baselineDelayMs + max(0, currentConcurrent - softLimit) * degradationFactor
+        /// </code>
+        /// </para>
+        /// <para>
+        /// <strong>EXAMPLE SCENARIOS (with defaults baselineDelayMs=500, softLimit=5, factor=200):</strong>
+        /// </para>
+        /// <list type="bullet">
+        /// <item>1 concurrent request → 500ms baseline only</item>
+        /// <item>10 concurrent requests → 500ms + (10-5)×200 = 1500ms total</item>
+        /// <item>20 concurrent requests → 500ms + (20-5)×200 = 3500ms total</item>
+        /// <item>50 concurrent requests → 500ms + (50-5)×200 = 9500ms total</item>
+        /// </list>
+        /// </remarks>
+        /// <response code="200">Load test completed successfully with timing details.</response>
+        /// <response code="500">Request exceeded errorAfter threshold and random exception was triggered.</response>
+        [HttpGet]
+        [Route("")]
+        [ResponseType(typeof(LoadTestResult))]
+        public async Task<IHttpActionResult> ExecuteLoadTest(
+            [FromUri] int workIterations = 200,
+            [FromUri] int bufferSizeKb = 20000,
+            [FromUri] int baselineDelayMs = 500,
+            [FromUri] int softLimit = 25,
+            [FromUri] int degradationFactor = 500,
+            [FromUri] int errorAfter = 120,
+            [FromUri] int errorPercent = 20,
+            CancellationToken cancellationToken = default)
         {
-            // Return structured error response with exception type for diagnostics
-            // This allows callers (like FailedRequestService) to extract the exception type
-            _logger.LogInformation(
-                "Load test threw expected exception: {ExceptionType} - {Message}",
-                ex.GetType().Name, ex.Message);
+            /*
+             * =====================================================================
+             * QUERY PARAMETER ENDPOINT
+             * =====================================================================
+             * 
+             * GET /api/loadtest?workIterations=5000&bufferSizeKb=1000&baselineDelayMs=500
+             * 
+             * Simple to use from:
+             * - Browser: just paste URL
+             * - curl: curl "http://localhost/api/loadtest?workIterations=5000"
+             * - Azure Load Testing: set URL directly
+             * - JMeter: HTTP Request sampler
+             */
             
-            return StatusCode(500, new 
-            { 
-                error = ex.GetType().Name,
-                message = ex.Message,
-                type = ex.GetType().FullName
-            });
+            var request = new LoadTestRequest
+            {
+                WorkIterations = workIterations,
+                BufferSizeKb = bufferSizeKb,
+                BaselineDelayMs = baselineDelayMs,
+                SoftLimit = softLimit,
+                DegradationFactor = degradationFactor,
+                ErrorAfterSeconds = errorAfter,
+                ErrorPercent = errorPercent
+            };
+            
+            Logger.Debug(
+                "Load test: WorkIterations={0}, BufferSizeKb={1}, BaselineDelayMs={2}, SoftLimit={3}, DegradationFactor={4}, ErrorAfter={5}s, ErrorPercent={6}%",
+                request.WorkIterations,
+                request.BufferSizeKb,
+                request.BaselineDelayMs,
+                request.SoftLimit,
+                request.DegradationFactor,
+                request.ErrorAfterSeconds,
+                request.ErrorPercent);
+
+            try
+            {
+                var result = await _loadTestService.ExecuteWorkAsync(request, cancellationToken);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                // Return structured error response with exception type for diagnostics
+                // This allows callers (like FailedRequestService) to extract the exception type
+                Logger.Info(
+                    "Load test threw expected exception: {0} - {1}",
+                    ex.GetType().Name, ex.Message);
+                
+                return Content((HttpStatusCode)500, new 
+                { 
+                    error = ex.GetType().Name,
+                    message = ex.Message,
+                    type = ex.GetType().FullName
+                });
+            }
         }
-    }
 
-    /*
-     * =========================================================================
-     * ENDPOINT: GET /api/loadtest/stats
-     * =========================================================================
-     * 
-     * Returns current load test statistics without performing work.
-     * Useful for monitoring concurrent request count during load tests.
-     */
-
-    /// <summary>
-    /// Gets current load test statistics including concurrent request count.
-    /// </summary>
-    /// <returns>Current load test statistics.</returns>
-    [HttpGet("stats")]
-    [ProducesResponseType(typeof(LoadTestStats), StatusCodes.Status200OK)]
-    public IActionResult GetStats()
-    {
         /*
-         * SYNCHRONOUS ENDPOINT:
-         * This returns IActionResult (not Task<IActionResult>) because it does
-         * no async work - just reads current statistics.
+         * =========================================================================
+         * ENDPOINT: GET /api/loadtest/stats
+         * =========================================================================
          * 
-         * PORTING:
-         * - Node.js: Can be sync or async (Express doesn't care)
-         * - Python: def get_stats() vs async def get_stats()
-         * - Java: Omit CompletableFuture for sync methods
-         * - PHP: No async distinction in traditional PHP
+         * Returns current load test statistics without performing work.
+         * Useful for monitoring concurrent request count during load tests.
          */
-        
-        var stats = _loadTestService.GetCurrentStats();
-        return Ok(stats);
+
+        /// <summary>
+        /// Gets current load test statistics including concurrent request count.
+        /// </summary>
+        /// <returns>Current load test statistics.</returns>
+        [HttpGet]
+        [Route("stats")]
+        [ResponseType(typeof(LoadTestStats))]
+        public IHttpActionResult GetStats()
+        {
+            /*
+             * SYNCHRONOUS ENDPOINT:
+             * This returns IHttpActionResult (not Task<IHttpActionResult>) because it does
+             * no async work - just reads current statistics.
+             * 
+             * PORTING:
+             * - Node.js: Can be sync or async (Express doesn't care)
+             * - Python: def get_stats() vs async def get_stats()
+             * - Java: Omit CompletableFuture for sync methods
+             * - PHP: No async distinction in traditional PHP
+             */
+            
+            var stats = _loadTestService.GetCurrentStats();
+            return Ok(stats);
+        }
     }
 }
 

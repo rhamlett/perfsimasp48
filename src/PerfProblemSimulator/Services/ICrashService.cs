@@ -1,10 +1,11 @@
 using PerfProblemSimulator.Models;
+using System.Collections.Generic;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Service interface for triggering controlled application crashes for diagnostic training.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Service interface for triggering controlled application crashes for diagnostic training.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -61,10 +62,11 @@ public interface ICrashService
     /// <remarks>
     /// <strong>WARNING:</strong> This method will terminate the application process!
     /// </remarks>
-    void TriggerCrash(CrashType crashType, int delaySeconds = 0, string? message = null, bool synchronous = false);
+    void TriggerCrash(CrashType crashType, int delaySeconds = 0, string message = null, bool synchronous = false);
 
-    /// <summary>
-    /// Gets a description of what each crash type does.
-    /// </summary>
-    Dictionary<CrashType, string> GetCrashTypeDescriptions();
+        /// <summary>
+        /// Gets a description of what each crash type does.
+        /// </summary>
+        Dictionary<CrashType, string> GetCrashTypeDescriptions();
+    }
 }

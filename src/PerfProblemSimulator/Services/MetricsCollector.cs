@@ -1,8 +1,15 @@
-using Microsoft.Extensions.Options;
-using PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using NLog;
+using PerfProblemSimulator.App_Start;
+using PerfProblemSimulator.Models;
 
-namespace PerfProblemSimulator.Services;
+namespace PerfProblemSimulator.Services
+{
 
 /// <summary>
 /// Collects system metrics on a dedicated thread for dashboard updates.
@@ -12,7 +19,7 @@ namespace PerfProblemSimulator.Services;
 /// <strong>Educational Note (FR-013 Implementation):</strong>
 /// </para>
 /// <para>
-/// This service uses a dedicated <see cref="Thread"/> instead of <see cref="Task.Run(System.Action)"/>
+/// This service uses a dedicated <see cref="Thread"/> instead of Task.Run
 /// for metrics collection. This is critical because:
 /// </para>
 /// <list type="number">
@@ -46,22 +53,52 @@ namespace PerfProblemSimulator.Services;
 /// consideration in production systems with many instances.
 /// </para>
 /// </remarks>
-public class MetricsCollector : IMetricsCollector
-{
-    private readonly ISimulationTracker _simulationTracker;
-    private readonly IMemoryPressureService _memoryPressureService;
-    private readonly ILogger<MetricsCollector> _logger;
-    private readonly ProblemSimulatorOptions _options;
+    public class MetricsCollector : IMetricsCollector
+    {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-    private Thread? _collectionThread;
-    private volatile bool _running;
-    private MetricsSnapshot _latestSnapshot;
-    private readonly object _snapshotLock = new();
+        // P/Invoke for getting actual system memory
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
 
-    // CPU measurement
-    private readonly Process _currentProcess;
-    private TimeSpan _lastCpuTime;
-    private DateTime _lastCpuMeasurement;
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+        private static double GetTotalPhysicalMemoryMb()
+        {
+            var memStatus = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX)) };
+            if (GlobalMemoryStatusEx(ref memStatus))
+            {
+                return memStatus.ullTotalPhys / (1024.0 * 1024.0);
+            }
+            return 8192.0; // Fallback to 8GB if P/Invoke fails
+        }
+
+        private readonly ISimulationTracker _simulationTracker;
+        private readonly IMemoryPressureService _memoryPressureService;
+        private readonly ProblemSimulatorOptions _options;
+
+        private Thread _collectionThread;
+        private volatile bool _running;
+        private MetricsSnapshot _latestSnapshot;
+        private readonly object _snapshotLock = new object();
+
+        // CPU measurement
+        private readonly Process _currentProcess;
+        private TimeSpan _lastCpuTime;
+        private DateTime _lastCpuMeasurement;
 
     /// <inheritdoc />
     public MetricsSnapshot LatestSnapshot
@@ -75,27 +112,27 @@ public class MetricsCollector : IMetricsCollector
         }
     }
 
-    /// <inheritdoc />
-    public event EventHandler<MetricsSnapshot>? MetricsCollected;
+        /// <inheritdoc />
+        public event EventHandler<MetricsSnapshot> MetricsCollected;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MetricsCollector"/> class.
-    /// </summary>
-    public MetricsCollector(
-        ISimulationTracker simulationTracker,
-        IMemoryPressureService memoryPressureService,
-        ILogger<MetricsCollector> logger,
-        IOptions<ProblemSimulatorOptions> options)
-    {
-        _simulationTracker = simulationTracker ?? throw new ArgumentNullException(nameof(simulationTracker));
-        _memoryPressureService = memoryPressureService ?? throw new ArgumentNullException(nameof(memoryPressureService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MetricsCollector"/> class.
+        /// </summary>
+        public MetricsCollector(
+            ISimulationTracker simulationTracker,
+            IMemoryPressureService memoryPressureService)
+        {
+            if (simulationTracker == null) throw new ArgumentNullException(nameof(simulationTracker));
+            if (memoryPressureService == null) throw new ArgumentNullException(nameof(memoryPressureService));
 
-        _currentProcess = Process.GetCurrentProcess();
-        _lastCpuTime = _currentProcess.TotalProcessorTime;
-        _lastCpuMeasurement = DateTime.UtcNow;
-    }
+            _simulationTracker = simulationTracker;
+            _memoryPressureService = memoryPressureService;
+            _options = ConfigurationHelper.Options;
+
+            _currentProcess = Process.GetCurrentProcess();
+            _lastCpuTime = _currentProcess.TotalProcessorTime;
+            _lastCpuMeasurement = DateTime.UtcNow;
+        }
 
     /// <inheritdoc />
     public void Start()
@@ -117,111 +154,114 @@ public class MetricsCollector : IMetricsCollector
         };
 
         _collectionThread.Start();
-        _logger.LogInformation("Metrics collector started on dedicated thread");
-    }
-
-    /// <inheritdoc />
-    public void Stop()
-    {
-        _running = false;
-        _collectionThread?.Join(TimeSpan.FromSeconds(2));
-        _logger.LogInformation("Metrics collector stopped");
-    }
-
-    /// <inheritdoc />
-    public ApplicationHealthStatus GetHealthStatus()
-    {
-        var snapshot = LatestSnapshot;
-        var memoryStatus = _memoryPressureService.GetMemoryStatus();
-        var activeSimulations = _simulationTracker.GetActiveSimulations();
-
-        ThreadPool.GetAvailableThreads(out var availableWorker, out var availableIo);
-        ThreadPool.GetMaxThreads(out var maxWorker, out var maxIo);
-
-        var warnings = new List<string>();
-
-        // Check for concerning conditions
-        if (snapshot.CpuPercent > 80)
-            warnings.Add($"High CPU usage: {snapshot.CpuPercent:F1}%");
-
-        if (snapshot.WorkingSetMb > 500)
-            warnings.Add($"High memory usage: {snapshot.WorkingSetMb:F0} MB");
-
-        if (availableWorker < maxWorker * 0.2)
-            warnings.Add($"Low available worker threads: {availableWorker}/{maxWorker}");
-
-        if (snapshot.ThreadPoolQueueLength > 10)
-            warnings.Add($"Thread pool queue backing up: {snapshot.ThreadPoolQueueLength} pending items");
-
-        return new ApplicationHealthStatus
-        {
-            Timestamp = snapshot.Timestamp,
-            IsHealthy = warnings.Count == 0,
-            Warnings = warnings,
-            Cpu = new CpuMetrics
-            {
-                UsagePercent = snapshot.CpuPercent,
-                ProcessorCount = Environment.ProcessorCount
-            },
-            Memory = new MemoryMetrics
-            {
-                WorkingSetBytes = (long)(snapshot.WorkingSetMb * 1024 * 1024),
-                GcHeapBytes = (long)(snapshot.GcHeapMb * 1024 * 1024),
-                AllocatedBlocksCount = memoryStatus.AllocatedBlocksCount,
-                AllocatedBlocksTotalBytes = memoryStatus.TotalAllocatedBytes
-            },
-            ThreadPool = new ThreadPoolMetrics
-            {
-                ThreadCount = snapshot.ThreadPoolThreads,
-                PendingWorkItems = snapshot.ThreadPoolQueueLength,
-                CompletedWorkItems = ThreadPool.CompletedWorkItemCount,
-                AvailableWorkerThreads = availableWorker,
-                MaxWorkerThreads = maxWorker,
-                AvailableIoThreads = availableIo,
-                MaxIoThreads = maxIo
-            },
-            ActiveSimulations = activeSimulations.Select(s => new SimulationSummary
-            {
-                Id = s.Id,
-                Type = s.Type,
-                StartedAt = s.StartedAt,
-                RunningDuration = DateTimeOffset.UtcNow - s.StartedAt
-            }).ToList()
-        };
-    }
-
-    /// <summary>
-    /// Main collection loop running on dedicated thread.
-    /// </summary>
-    private void CollectionLoop()
-    {
-        _logger.LogDebug("Metrics collection loop started");
-
-        while (_running)
-        {
-            try
-            {
-                var snapshot = CollectMetrics();
-
-                lock (_snapshotLock)
-                {
-                    _latestSnapshot = snapshot;
-                }
-
-                // Raise event for SignalR broadcast
-                MetricsCollected?.Invoke(this, snapshot);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error collecting metrics");
-            }
-
-            // Sleep on this thread (not using Task.Delay which uses thread pool!)
-            Thread.Sleep(_options.MetricsCollectionIntervalMs);
+            Logger.Info("Metrics collector started on dedicated thread");
         }
 
-        _logger.LogDebug("Metrics collection loop ended");
-    }
+        /// <inheritdoc />
+        public void Stop()
+        {
+            _running = false;
+            if (_collectionThread != null) _collectionThread.Join(TimeSpan.FromSeconds(2));
+            Logger.Info("Metrics collector stopped");
+        }
+
+        /// <inheritdoc />
+        public ApplicationHealthStatus GetHealthStatus()
+        {
+            var snapshot = LatestSnapshot;
+            var memoryStatus = _memoryPressureService.GetMemoryStatus();
+            var activeSimulations = _simulationTracker.GetActiveSimulations();
+
+            int availableWorker, availableIo;
+            ThreadPool.GetAvailableThreads(out availableWorker, out availableIo);
+            int maxWorker, maxIo;
+            ThreadPool.GetMaxThreads(out maxWorker, out maxIo);
+
+            var warnings = new List<string>();
+
+            // Check for concerning conditions
+            if (snapshot.CpuPercent > 80)
+                warnings.Add(string.Format("High CPU usage: {0:F1}%", snapshot.CpuPercent));
+
+            if (snapshot.WorkingSetMb > 500)
+                warnings.Add(string.Format("High memory usage: {0:F0} MB", snapshot.WorkingSetMb));
+
+            if (availableWorker < maxWorker * 0.2)
+                warnings.Add(string.Format("Low available worker threads: {0}/{1}", availableWorker, maxWorker));
+
+            if (snapshot.ThreadPoolQueueLength > 10)
+                warnings.Add(string.Format("Thread pool queue backing up: {0} pending items", snapshot.ThreadPoolQueueLength));
+
+            return new ApplicationHealthStatus
+            {
+                Timestamp = snapshot.Timestamp,
+                IsHealthy = warnings.Count == 0,
+                Warnings = warnings,
+                Cpu = new CpuMetrics
+                {
+                    UsagePercent = snapshot.CpuPercent,
+                    ProcessorCount = Environment.ProcessorCount
+                },
+                Memory = new MemoryMetrics
+                {
+                    WorkingSetBytes = (long)(snapshot.WorkingSetMb * 1024 * 1024),
+                    GcHeapBytes = (long)(snapshot.GcHeapMb * 1024 * 1024),
+                    AllocatedBlocksCount = memoryStatus.AllocatedBlocksCount,
+                    AllocatedBlocksTotalBytes = memoryStatus.TotalAllocatedBytes
+                },
+                ThreadPool = new ThreadPoolMetrics
+                {
+                    ThreadCount = snapshot.ThreadPoolThreads,
+                    PendingWorkItems = snapshot.ThreadPoolQueueLength,
+                    CompletedWorkItems = 0, // ThreadPool.CompletedWorkItemCount not available in .NET Framework 4.8
+                    AvailableWorkerThreads = availableWorker,
+                    MaxWorkerThreads = maxWorker,
+                    AvailableIoThreads = availableIo,
+                    MaxIoThreads = maxIo
+                },
+                ActiveSimulations = activeSimulations.Select(s => new SimulationSummary
+                {
+                    Id = s.Id,
+                    Type = s.Type,
+                    StartedAt = s.StartedAt,
+                    RunningDuration = DateTimeOffset.UtcNow - s.StartedAt
+                }).ToList()
+            };
+        }
+
+        /// <summary>
+        /// Main collection loop running on dedicated thread.
+        /// </summary>
+        private void CollectionLoop()
+        {
+            Logger.Debug("Metrics collection loop started");
+
+            while (_running)
+            {
+                try
+                {
+                    var snapshot = CollectMetrics();
+
+                    lock (_snapshotLock)
+                    {
+                        _latestSnapshot = snapshot;
+                    }
+
+                    // Raise event for SignalR broadcast
+                    var handler = MetricsCollected;
+                    if (handler != null) handler(this, snapshot);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error collecting metrics");
+                }
+
+                // Sleep on this thread (not using Task.Delay which uses thread pool!)
+                Thread.Sleep(_options.MetricsCollectionIntervalMs);
+            }
+
+            Logger.Debug("Metrics collection loop ended");
+        }
 
     /// <summary>
     /// Collects all metrics for a snapshot.
@@ -244,14 +284,20 @@ public class MetricsCollector : IMetricsCollector
         // Get memory info
         var workingSetMb = _currentProcess.WorkingSet64 / (1024.0 * 1024.0);
         var gcHeapMb = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
-        var gcMemoryInfo = GC.GetGCMemoryInfo();
-        var totalAvailableMemoryMb = gcMemoryInfo.TotalAvailableMemoryBytes / (1024.0 * 1024.0);
+        // Use actual system memory via P/Invoke
+        var totalAvailableMemoryMb = GetTotalPhysicalMemoryMb();
 
         // Get thread pool info
-        ThreadPool.GetAvailableThreads(out var availableWorker, out _);
-        ThreadPool.GetMaxThreads(out var maxWorker, out _);
-        var threadPoolThreads = maxWorker - availableWorker;
-        var queueLength = ThreadPool.PendingWorkItemCount;
+            int availableWorker, availableIo;
+            ThreadPool.GetAvailableThreads(out availableWorker, out availableIo);
+            int maxWorker, maxIo;
+            ThreadPool.GetMaxThreads(out maxWorker, out maxIo);
+            var threadPoolThreads = maxWorker - availableWorker;
+            // Note: ThreadPool.PendingWorkItemCount not available in .NET Framework 4.8
+            var queueLength = 0L;
+            // Silence IDE warning about unused out parameters - they're required by the API
+            _ = availableIo;
+            _ = maxIo;
 
         // Get active simulation count
         var activeCount = _simulationTracker.ActiveCount;
@@ -270,11 +316,12 @@ public class MetricsCollector : IMetricsCollector
         };
     }
 
-    /// <inheritdoc />
-    public void Dispose()
-    {
-        Stop();
-        _currentProcess.Dispose();
-        GC.SuppressFinalize(this);
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            Stop();
+            _currentProcess.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 }

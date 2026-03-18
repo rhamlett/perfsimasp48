@@ -19,15 +19,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
   </ItemGroup>
 
-  <!-- .NET 10 specific test packages -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
-  </ItemGroup>
-
-  <!-- .NET 8 specific test packages -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.0" />
-  </ItemGroup>
+  <!-- .NET Framework 4.8 does not use AspNetCore.Mvc.Testing -->
 
   <ItemGroup>
     <Using Include="Xunit" />

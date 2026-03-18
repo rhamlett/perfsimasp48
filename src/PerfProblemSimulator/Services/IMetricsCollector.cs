@@ -1,6 +1,8 @@
 using PerfProblemSimulator.Models;
+using System;
 
-namespace PerfProblemSimulator.Services;
+namespace PerfProblemSimulator.Services
+{
 
 /// <summary>
 /// Interface for collecting system metrics on a dedicated thread.
@@ -52,7 +54,7 @@ public interface IMetricsCollector : IDisposable
     /// <summary>
     /// Event raised when new metrics are collected.
     /// </summary>
-    event EventHandler<MetricsSnapshot>? MetricsCollected;
+    event EventHandler<MetricsSnapshot> MetricsCollected;
 
     /// <summary>
     /// Starts the metrics collection thread.
@@ -63,4 +65,5 @@ public interface IMetricsCollector : IDisposable
     /// Stops the metrics collection thread.
     /// </summary>
     void Stop();
+}
 }

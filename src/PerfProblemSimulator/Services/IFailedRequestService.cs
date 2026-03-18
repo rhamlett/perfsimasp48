@@ -1,10 +1,11 @@
 using PerfProblemSimulator.Models;
+using System;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Service interface for generating failed HTTP requests (5xx responses).
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Service interface for generating failed HTTP requests (5xx responses).
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -91,4 +92,5 @@ public class FailedRequestStatus
     /// When the simulation started.
     /// </summary>
     public DateTimeOffset? StartedAt { get; set; }
+    }
 }

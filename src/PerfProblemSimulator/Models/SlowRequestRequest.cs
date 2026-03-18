@@ -1,8 +1,8 @@
-namespace PerfProblemSimulator.Models;
-
-/// <summary>
-/// Configuration for slow request simulation that causes thread pool starvation.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Configuration for slow request simulation that causes thread pool starvation.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -80,4 +80,5 @@ public enum SlowRequestScenario
     /// Profiler shows: Common pattern found in legacy code migrations.
     /// </summary>
     DatabasePattern
+}
 }

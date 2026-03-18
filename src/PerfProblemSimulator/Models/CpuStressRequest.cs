@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PerfProblemSimulator.Models;
-
-/// <summary>
-/// Request model for triggering high CPU usage simulation.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Request model for triggering high CPU usage simulation.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>Educational Note:</strong> This request model demonstrates the use of
@@ -43,4 +43,5 @@ public class CpuStressRequest
     /// </para>
     /// </remarks>
     public string Level { get; set; } = "high";
+    }
 }

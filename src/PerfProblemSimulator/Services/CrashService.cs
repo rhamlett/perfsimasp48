@@ -1,12 +1,16 @@
+using NLog;
 using PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Service that triggers intentional application crashes for educational purposes.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Service that triggers intentional application crashes for educational purposes.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong> Demonstrates various crash scenarios for learning Azure crash
@@ -52,27 +56,22 @@ namespace PerfProblemSimulator.Services;
 /// </para>
 /// </remarks>
 public class CrashService : ICrashService
-{
-    private readonly ILogger<CrashService> _logger;
-
-    public CrashService(ILogger<CrashService> logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-    /// <inheritdoc />
-    public void TriggerCrash(CrashType crashType, int delaySeconds = 0, string? message = null, bool synchronous = false)
-    {
-        var crashMessage = message ?? $"Intentional {crashType} crash triggered by Performance Problem Simulator";
-
-        _logger.LogCritical(
-            "⚠️ CRASH TRIGGERED: Type={CrashType}, Delay={DelaySeconds}s, Synchronous={Synchronous}, Message={Message}",
-            crashType, delaySeconds, synchronous, crashMessage);
-
-        // Synchronous mode: crash immediately during the request (best for Azure Crash Monitoring)
-        if (synchronous)
+        /// <inheritdoc />
+        public void TriggerCrash(CrashType crashType, int delaySeconds = 0, string message = null, bool synchronous = false)
         {
-            _logger.LogCritical("💥 SYNCHRONOUS CRASH - No response will be sent!");
+            var crashMessage = message ?? $"Intentional {crashType} crash triggered by Performance Problem Simulator";
+
+            Logger.Fatal(
+                "⚠️ CRASH TRIGGERED: Type={0}, Delay={1}s, Synchronous={2}, Message={3}",
+                crashType, delaySeconds, synchronous, crashMessage);
+
+            // Synchronous mode: crash immediately during the request (best for Azure Crash Monitoring)
+            if (synchronous)
+            {
+                Logger.Fatal("💥 SYNCHRONOUS CRASH - No response will be sent!");
             ExecuteCrash(crashType, crashMessage);
             return; // Never reached
         }
@@ -80,7 +79,7 @@ public class CrashService : ICrashService
         // Async mode: crash on background thread after response is sent
         if (delaySeconds > 0)
         {
-            _logger.LogWarning("Crash will occur in {DelaySeconds} seconds...", delaySeconds);
+            Logger.Warn("Crash will occur in {0} seconds...", delaySeconds);
             
             // Use a dedicated thread for the crash to ensure it happens even during thread pool starvation
             var crashThread = new Thread(() =>
@@ -113,9 +112,9 @@ public class CrashService : ICrashService
     /// <summary>
     /// Executes the actual crash based on the crash type.
     /// </summary>
-    private void ExecuteCrash(CrashType crashType, string message)
-    {
-        _logger.LogCritical("💥 Executing {CrashType} crash NOW!", crashType);
+        private void ExecuteCrash(CrashType crashType, string message)
+        {
+            Logger.Fatal("💥 Executing {0} crash NOW!", crashType);
 
         switch (crashType)
         {
@@ -182,7 +181,9 @@ public class CrashService : ICrashService
     /// </para>
     /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)] // Prevent tail-call optimization
+#pragma warning disable CA1822, S2190 // Mark members as static - intentionally recursive instance method for stack overflow simulation
     private void ExecuteStackOverflow(int depth)
+#pragma warning restore CA1822, S2190
     {
         // Create some local variables to consume stack space faster
         var buffer = new byte[1024];
@@ -246,9 +247,9 @@ public class CrashService : ICrashService
     {
         // Use native RaiseException to trigger a real access violation (0xC0000005)
         // This bypasses .NET's runtime protections and causes a genuine native crash
-        const uint EXCEPTION_ACCESS_VIOLATION = 0xC0000005;
-        const uint EXCEPTION_NONCONTINUABLE = 0x1;
-        RaiseException(EXCEPTION_ACCESS_VIOLATION, EXCEPTION_NONCONTINUABLE, 0, IntPtr.Zero);
+        const uint exceptionAccessViolation = 0xC0000005;
+        const uint exceptionNoncontinuable = 0x1;
+        RaiseException(exceptionAccessViolation, exceptionNoncontinuable, 0, IntPtr.Zero);
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -275,7 +276,7 @@ public class CrashService : ICrashService
         var allocationSize = 100 * 1024 * 1024; // 100 MB chunks
         var totalAllocated = 0L;
 
-        _logger.LogWarning("Starting aggressive memory allocation until crash...");
+        Logger.Warn("Starting aggressive memory allocation until crash...");
 
         // Disable GC compaction to make it harder for the runtime to recover
         System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.Default;
@@ -284,32 +285,28 @@ public class CrashService : ICrashService
         {
             while (true)
             {
-                try
+                // Allocate memory and pin it to prevent GC from reclaiming it
+                var block = new byte[allocationSize];
+                    
+                // Pin the block to prevent GC from reclaiming it
+                // Store the handle with the block to keep reference alive
+                GCHandle.Alloc(block, GCHandleType.Pinned);
+                    
+                // Touch the memory to ensure it's committed
+                for (int i = 0; i < block.Length; i += 4096)
                 {
-                    // Allocate pinned memory to prevent GC from moving or reclaiming it
-                    var block = GC.AllocateArray<byte>(allocationSize, pinned: true);
-                    
-                    // Touch the memory to ensure it's committed
-                    for (int i = 0; i < block.Length; i += 4096)
-                    {
-                        block[i] = 0xFF;
-                    }
-                    
-                    allocations.Add(block);
-                    totalAllocated += allocationSize;
-                    
-                    _logger.LogWarning("Allocated {TotalMB} MB (pinned)...", totalAllocated / (1024 * 1024));
+                    block[i] = 0xFF;
                 }
-                catch (OutOfMemoryException)
-                {
-                    // Re-throw to be caught by outer handler
-                    throw;
-                }
+                    
+                allocations.Add(block);
+                totalAllocated += allocationSize;
+                    
+                Logger.Warn("Allocated {0} MB (pinned)...", totalAllocated / (1024 * 1024));
             }
         }
         catch (OutOfMemoryException)
         {
-            _logger.LogCritical("OutOfMemoryException caught at {TotalMB} MB, forcing fatal crash...", 
+            Logger.Fatal("OutOfMemoryException caught at {0} MB, forcing fatal crash...", 
                 totalAllocated / (1024 * 1024));
             
             // Keep allocations alive to prevent GC from recovering
@@ -324,16 +321,17 @@ public class CrashService : ICrashService
         }
     }
 
-    /// <inheritdoc />
-    public Dictionary<CrashType, string> GetCrashTypeDescriptions()
-    {
-        return new Dictionary<CrashType, string>
+        /// <inheritdoc />
+        public Dictionary<CrashType, string> GetCrashTypeDescriptions()
         {
-            [CrashType.FailFast] = "Calls Environment.FailFast() which immediately terminates the process with a Windows Error Report. Best for general crash testing.",
-            [CrashType.StackOverflow] = "Triggers StackOverflowException via infinite recursion. Cannot be caught. Creates interesting stack traces for analysis.",
-            [CrashType.UnhandledException] = "Throws an unhandled exception on a background thread, demonstrating the importance of proper exception handling.",
-            [CrashType.AccessViolation] = "Writes to invalid memory (null pointer). Demonstrates native-level crashes common in P/Invoke or unsafe code bugs.",
-            [CrashType.OutOfMemory] = "Allocates memory until the process crashes. Useful for learning memory dump analysis techniques."
-        };
+            return new Dictionary<CrashType, string>
+            {
+                [CrashType.FailFast] = "Calls Environment.FailFast() which immediately terminates the process with a Windows Error Report. Best for general crash testing.",
+                [CrashType.StackOverflow] = "Triggers StackOverflowException via infinite recursion. Cannot be caught. Creates interesting stack traces for analysis.",
+                [CrashType.UnhandledException] = "Throws an unhandled exception on a background thread, demonstrating the importance of proper exception handling.",
+                [CrashType.AccessViolation] = "Writes to invalid memory (null pointer). Demonstrates native-level crashes common in P/Invoke or unsafe code bugs.",
+                [CrashType.OutOfMemory] = "Allocates memory until the process crashes. Useful for learning memory dump analysis techniques."
+            };
+        }
     }
 }

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace PerfProblemSimulator.Models;
+namespace PerfProblemSimulator.Models
+{
 
 /// <summary>
 /// Request model for allocating memory to create memory pressure.
@@ -33,4 +34,5 @@ public class MemoryAllocationRequest
     /// </remarks>
     [Range(1, int.MaxValue, ErrorMessage = "Size must be at least 1 MB")]
     public int SizeMegabytes { get; set; } = 100;
+}
 }

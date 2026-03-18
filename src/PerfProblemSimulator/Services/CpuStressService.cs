@@ -1,11 +1,16 @@
+using NLog;
 using PerfProblemSimulator.Models;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Service that creates high CPU usage through parallel spin loops.
-/// </summary>
+namespace PerfProblemSimulator.Services
+{
+    /// <summary>
+    /// Service that creates high CPU usage through parallel spin loops.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>⚠️ EDUCATIONAL PURPOSE ONLY ⚠️</strong>
@@ -84,27 +89,24 @@ namespace PerfProblemSimulator.Services;
 /// </para>
 /// </remarks>
 public class CpuStressService : ICpuStressService
-{
-    private readonly ISimulationTracker _simulationTracker;
-    private readonly ILogger<CpuStressService> _logger;
-
-    /// <summary>
-    /// Default duration in seconds when not specified or invalid.
-    /// </summary>
-    private const int _defaultDurationSeconds = 30;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CpuStressService"/> class.
-    /// </summary>
-    /// <param name="simulationTracker">Service for tracking active simulations.</param>
-    /// <param name="logger">Logger for diagnostic information.</param>
-    public CpuStressService(
-        ISimulationTracker simulationTracker,
-        ILogger<CpuStressService> logger)
     {
-        _simulationTracker = simulationTracker ?? throw new ArgumentNullException(nameof(simulationTracker));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+        private readonly ISimulationTracker _simulationTracker;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Default duration in seconds when not specified or invalid.
+        /// </summary>
+        private const int DefaultDurationSeconds = 30;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CpuStressService"/> class.
+        /// </summary>
+        /// <param name="simulationTracker">Service for tracking active simulations.</param>
+        public CpuStressService(ISimulationTracker simulationTracker)
+        {
+            if (simulationTracker == null) throw new ArgumentNullException(nameof(simulationTracker));
+            _simulationTracker = simulationTracker;
+        }
 
     /// <inheritdoc />
     public Task<SimulationResult> TriggerCpuStressAsync(int durationSeconds, CancellationToken cancellationToken, string level = "high")
@@ -113,15 +115,20 @@ public class CpuStressService : ICpuStressService
         // STEP 1: Validate the duration (no upper limits - app is meant to break)
         // ==========================================================================
         var actualDuration = durationSeconds <= 0
-            ? _defaultDurationSeconds
+            ? DefaultDurationSeconds
             : durationSeconds;
 
         // Normalize level to lowercase and default to "high" if invalid
-        var normalizedLevel = level.ToLowerInvariant() switch
-        {
-            "moderate" => "moderate",
-            _ => "high"
-        };
+            string normalizedLevel;
+            switch (level.ToLowerInvariant())
+            {
+                case "moderate":
+                    normalizedLevel = "moderate";
+                    break;
+                default:
+                    normalizedLevel = "high";
+                    break;
+            }
 
         var simulationId = Guid.NewGuid();
         var startedAt = DateTimeOffset.UtcNow;
@@ -145,8 +152,8 @@ public class CpuStressService : ICpuStressService
         // Register this simulation with the tracker
         _simulationTracker.RegisterSimulation(simulationId, SimulationType.Cpu, parameters, cts);
 
-        _logger.LogInformation(
-            "Starting CPU stress simulation {SimulationId}: {Duration}s @ {Level} across {ProcessorCount} cores",
+        Logger.Info(
+            "Starting CPU stress simulation {0}: {1}s @ {2} across {3} cores",
             simulationId,
             actualDuration,
             normalizedLevel,
@@ -293,21 +300,21 @@ public class CpuStressService : ICpuStressService
                 thread.Join();
             }
 
-            _logger.LogInformation(
-                "CPU stress simulation {SimulationId} completed normally after {Duration}s",
+            Logger.Info(
+                "CPU stress simulation {0} completed normally after {1}s",
                 simulationId,
                 durationSeconds);
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation(
-                "CPU stress simulation {SimulationId} was cancelled",
+            Logger.Info(
+                "CPU stress simulation {0} was cancelled",
                 simulationId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
-                "CPU stress simulation {SimulationId} failed with error",
+            Logger.Error(ex,
+                "CPU stress simulation {0} failed with error",
                 simulationId);
         }
         finally
@@ -315,5 +322,6 @@ public class CpuStressService : ICpuStressService
             // Always unregister the simulation when done
             _simulationTracker.UnregisterSimulation(simulationId);
         }
+    }
     }
 }

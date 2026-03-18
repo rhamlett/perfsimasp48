@@ -1,302 +1,279 @@
-using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNet.SignalR;
+using NLog;
 using PerfProblemSimulator.Hubs;
 using PerfProblemSimulator.Models;
+using System;
 using System.Collections.Concurrent;
+using System.Threading;
 
-namespace PerfProblemSimulator.Services;
-
-/// <summary>
-/// Background service that broadcasts metrics to SignalR clients.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <strong>PURPOSE:</strong>
-/// </para>
-/// <para>
-/// This hosted service acts as a bridge between the MetricsCollector and SignalR.
-/// It subscribes to metrics events and broadcasts them to all connected clients.
-/// </para>
-/// <para>
-/// <strong>ALGORITHM:</strong>
-/// 1. Start dedicated broadcast thread (not from thread pool)
-/// 2. Subscribe to MetricsCollector.MetricsCollected event
-/// 3. When metrics received, queue to BlockingCollection
-/// 4. Broadcast thread reads from queue and pushes to all SignalR clients
-/// 5. Fire-and-forget: Don't await SignalR send to avoid thread pool dependency
-/// </para>
-/// <para>
-/// <strong>Thread Pool Independence (Critical for Load Testing):</strong>
-/// </para>
-/// <para>
-/// When the load test endpoint exhausts the thread pool, SignalR broadcasts would
-/// normally freeze because they rely on thread pool threads. To prevent this, we use:
-/// </para>
-/// <list type="bullet">
-/// <item>A dedicated broadcast thread (not from thread pool)</item>
-/// <item>A message queue (BlockingCollection) for thread-safe message passing</item>
-/// <item>Fire-and-forget semantics that don't await thread pool continuations</item>
-/// </list>
-/// <para>
-/// This ensures the dashboard continues updating even during severe thread pool starvation.
-/// </para>
-/// <para>
-/// <strong>PORTING TO OTHER LANGUAGES:</strong>
-/// The pattern of dedicated background worker for real-time updates:
-/// <list type="bullet">
-/// <item>PHP: Separate process with ReactPHP or Swoole for WebSocket server</item>
-/// <item>Node.js: Not needed - Socket.IO runs on main event loop (but watch for blocking!)</item>
-/// <item>Java: ScheduledExecutorService or dedicated Thread with LinkedBlockingQueue</item>
-/// <item>Python: threading.Thread with queue.Queue, or asyncio task with asyncio.Queue</item>
-/// <item>Ruby: Thread.new with Thread::Queue for producer-consumer pattern</item>
-/// </list>
-/// The BlockingCollection pattern maps to:
-/// <list type="bullet">
-/// <item>Node.js: async queue pattern or RxJS Subject</item>
-/// <item>Java: BlockingQueue (LinkedBlockingQueue, ArrayBlockingQueue)</item>
-/// <item>Python: queue.Queue (blocking) or asyncio.Queue</item>
-/// <item>Ruby: Thread::Queue</item>
-/// </list>
-/// </para>
-/// <para>
-/// <strong>RELATED FILES:</strong>
-/// IMetricsCollector.cs (event source), MetricsHub.cs (SignalR endpoint),
-/// SimulationTracker.cs (simulation events), Models/MetricsSnapshot.cs
-/// </para>
-/// </remarks>
-public class MetricsBroadcastService : IHostedService
+namespace PerfProblemSimulator.Services
 {
-    private readonly IMetricsCollector _metricsCollector;
-    private readonly ISimulationTracker _simulationTracker;
-    private readonly IIdleStateService _idleStateService;
-    private readonly IHubContext<MetricsHub, IMetricsClient> _hubContext;
-    private readonly ILogger<MetricsBroadcastService> _logger;
-    
-    // Message queue for thread-pool-independent broadcasting
-    private readonly BlockingCollection<BroadcastMessage> _messageQueue = new(boundedCapacity: 100);
-    private Thread? _broadcastThread;
-    private volatile bool _running;
-
     /// <summary>
-    /// Initializes a new instance of the <see cref="MetricsBroadcastService"/> class.
-    /// </summary>
-    public MetricsBroadcastService(
-        IMetricsCollector metricsCollector,
-        ISimulationTracker simulationTracker,
-        IIdleStateService idleStateService,
-        IHubContext<MetricsHub, IMetricsClient> hubContext,
-        ILogger<MetricsBroadcastService> logger)
-    {
-        _metricsCollector = metricsCollector ?? throw new ArgumentNullException(nameof(metricsCollector));
-        _simulationTracker = simulationTracker ?? throw new ArgumentNullException(nameof(simulationTracker));
-        _idleStateService = idleStateService ?? throw new ArgumentNullException(nameof(idleStateService));
-        _hubContext = hubContext ?? throw new ArgumentNullException(nameof(hubContext));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    /// <inheritdoc />
-    public Task StartAsync(CancellationToken cancellationToken)
-    {
-        _running = true;
-        
-        // Start dedicated broadcast thread (not from thread pool)
-        _broadcastThread = new Thread(BroadcastLoop)
-        {
-            Name = "SignalR-Broadcast",
-            IsBackground = true,
-            Priority = ThreadPriority.AboveNormal // Prioritize dashboard updates
-        };
-        _broadcastThread.Start();
-        
-        _metricsCollector.MetricsCollected += OnMetricsCollected;
-        _simulationTracker.SimulationStarted += OnSimulationStarted;
-        _simulationTracker.SimulationCompleted += OnSimulationCompleted;
-        _idleStateService.GoingIdle += OnGoingIdle;
-        _idleStateService.WakingUp += OnWakingUp;
-        _metricsCollector.Start();
-
-        _logger.LogInformation("Metrics broadcast service started with dedicated broadcast thread");
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        _running = false;
-        _messageQueue.CompleteAdding();
-        
-        _metricsCollector.MetricsCollected -= OnMetricsCollected;
-        _simulationTracker.SimulationStarted -= OnSimulationStarted;
-        _simulationTracker.SimulationCompleted -= OnSimulationCompleted;
-        _idleStateService.GoingIdle -= OnGoingIdle;
-        _idleStateService.WakingUp -= OnWakingUp;
-        _metricsCollector.Stop();
-        
-        // Wait for broadcast thread to finish (with timeout)
-        _broadcastThread?.Join(TimeSpan.FromSeconds(5));
-
-        _logger.LogInformation("Metrics broadcast service stopped");
-        return Task.CompletedTask;
-    }
-    
-    /// <summary>
-    /// Dedicated thread loop that processes broadcast messages.
-    /// This runs independently of the thread pool.
-    /// </summary>
-    private void BroadcastLoop()
-    {
-        _logger.LogDebug("Broadcast thread started");
-        
-        while (_running || _messageQueue.Count > 0)
-        {
-            try
-            {
-                // TryTake with timeout to allow checking _running flag
-                if (_messageQueue.TryTake(out var message, TimeSpan.FromMilliseconds(100)))
-                {
-                    ProcessMessage(message);
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // Collection was marked as complete - exit loop
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in broadcast loop");
-            }
-        }
-        
-        _logger.LogDebug("Broadcast thread exiting");
-    }
-    
-    /// <summary>
-    /// Process a single broadcast message.
-    /// Uses fire-and-forget pattern - don't wait for SignalR completion.
+    /// Background service that broadcasts metrics to SignalR clients.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <strong>Why Fire-and-Forget:</strong>
+    /// <strong>PURPOSE:</strong>
+    /// This service acts as a bridge between the MetricsCollector and SignalR.
+    /// It subscribes to metrics events and broadcasts them to all connected clients.
     /// </para>
     /// <para>
-    /// SignalR's SendAsync internally uses thread pool threads for I/O completion.
-    /// If we block waiting (GetAwaiter().GetResult()), we deadlock when the pool is exhausted.
-    /// Instead, we fire the send and move on. Messages may be delayed during extreme load,
-    /// but the dashboard will receive updates as soon as any thread pool thread becomes available.
+    /// <strong>Thread Pool Independence (Critical for Load Testing):</strong>
+    /// When the load test endpoint exhausts the thread pool, SignalR broadcasts would
+    /// normally freeze because they rely on thread pool threads. To prevent this, we use:
+    /// - A dedicated broadcast thread (not from thread pool)
+    /// - A message queue (BlockingCollection) for thread-safe message passing
+    /// - Fire-and-forget semantics that don't await thread pool continuations
     /// </para>
     /// </remarks>
-    private void ProcessMessage(BroadcastMessage message)
+    public class MetricsBroadcastService
     {
-        try
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private readonly IMetricsCollector _metricsCollector;
+        private readonly ISimulationTracker _simulationTracker;
+        private readonly IIdleStateService _idleStateService;
+
+        // Message queue for thread-pool-independent broadcasting
+        private readonly BlockingCollection<BroadcastMessage> _messageQueue = new BlockingCollection<BroadcastMessage>(100);
+        private Thread _broadcastThread;
+        private volatile bool _running;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MetricsBroadcastService"/> class.
+        /// </summary>
+        public MetricsBroadcastService(
+            IMetricsCollector metricsCollector,
+            ISimulationTracker simulationTracker,
+            IIdleStateService idleStateService)
         {
-            // Fire-and-forget: kick off the send, don't wait for completion
-            // The underscore discards the Task to suppress compiler warnings
-            var sendTask = message.Type switch
+            if (metricsCollector == null) throw new ArgumentNullException("metricsCollector");
+            if (simulationTracker == null) throw new ArgumentNullException("simulationTracker");
+            if (idleStateService == null) throw new ArgumentNullException("idleStateService");
+
+            _metricsCollector = metricsCollector;
+            _simulationTracker = simulationTracker;
+            _idleStateService = idleStateService;
+        }
+
+        /// <summary>
+        /// Starts the metrics broadcast service.
+        /// </summary>
+        public void Start()
+        {
+            _running = true;
+
+            // Start dedicated broadcast thread (not from thread pool)
+            _broadcastThread = new Thread(BroadcastLoop)
             {
-                BroadcastType.Metrics => 
-                    _hubContext.Clients.All.ReceiveMetrics((MetricsSnapshot)message.Data!),
-                    
-                BroadcastType.SimulationStarted => 
-                    FireSimulationStarted((SimulationEventArgs)message.Data!),
-                    
-                BroadcastType.SimulationCompleted => 
-                    FireSimulationCompleted((SimulationEventArgs)message.Data!),
-                    
-                BroadcastType.Latency => 
-                    _hubContext.Clients.All.ReceiveLatency((LatencyMeasurement)message.Data!),
-                    
-                BroadcastType.SlowRequestLatency => 
-                    _hubContext.Clients.All.ReceiveSlowRequestLatency((SlowRequestLatencyData)message.Data!),
-                    
-                BroadcastType.LoadTestStats => 
-                    _hubContext.Clients.All.ReceiveLoadTestStats((LoadTestStatsData)message.Data!),
-                    
-                BroadcastType.IdleState => 
-                    _hubContext.Clients.All.ReceiveIdleState((IdleStateData)message.Data!),
-                    
-                _ => Task.CompletedTask
+                Name = "SignalR-Broadcast",
+                IsBackground = true,
+                Priority = ThreadPriority.AboveNormal
             };
-            
-            // Continue error handling on any available thread
-            _ = sendTask.ContinueWith(t =>
+            _broadcastThread.Start();
+
+            _metricsCollector.MetricsCollected += OnMetricsCollected;
+            _simulationTracker.SimulationStarted += OnSimulationStarted;
+            _simulationTracker.SimulationCompleted += OnSimulationCompleted;
+            _idleStateService.GoingIdle += OnGoingIdle;
+            _idleStateService.WakingUp += OnWakingUp;
+            _metricsCollector.Start();
+
+            Logger.Info("Metrics broadcast service started with dedicated broadcast thread");
+        }
+
+        /// <summary>
+        /// Stops the metrics broadcast service.
+        /// </summary>
+        public void Stop()
+        {
+            _running = false;
+            _messageQueue.CompleteAdding();
+
+            _metricsCollector.MetricsCollected -= OnMetricsCollected;
+            _simulationTracker.SimulationStarted -= OnSimulationStarted;
+            _simulationTracker.SimulationCompleted -= OnSimulationCompleted;
+            _idleStateService.GoingIdle -= OnGoingIdle;
+            _idleStateService.WakingUp -= OnWakingUp;
+            _metricsCollector.Stop();
+
+            // Wait for broadcast thread to finish (with timeout)
+            if (_broadcastThread != null)
             {
-                if (t.IsFaulted)
+                _broadcastThread.Join(TimeSpan.FromSeconds(5));
+            }
+
+            Logger.Info("Metrics broadcast service stopped");
+        }
+
+        /// <summary>
+        /// Dedicated thread loop that processes broadcast messages.
+        /// </summary>
+        private void BroadcastLoop()
+        {
+            Logger.Debug("Broadcast thread started");
+
+            while (_running || _messageQueue.Count > 0)
+            {
+                try
                 {
-                    _logger.LogWarning(t.Exception?.InnerException, "SignalR send failed for {Type}", message.Type);
+                    BroadcastMessage message;
+                    if (_messageQueue.TryTake(out message, TimeSpan.FromMilliseconds(100)))
+                    {
+                        ProcessMessage(message);
+                    }
                 }
-            }, TaskContinuationOptions.OnlyOnFaulted);
+                catch (InvalidOperationException)
+                {
+                    // Collection was marked as complete - exit loop
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error in broadcast loop");
+                }
+            }
+
+            Logger.Debug("Broadcast thread exiting");
         }
-        catch (Exception ex)
+
+        /// <summary>
+        /// Process a single broadcast message.
+        /// </summary>
+        private void ProcessMessage(BroadcastMessage message)
         {
-            _logger.LogWarning(ex, "Error initiating broadcast for {Type} message", message.Type);
+            try
+            {
+                var hubContext = GlobalHost.ConnectionManager.GetHubContext<MetricsHub>();
+
+                switch (message.Type)
+                {
+                    case BroadcastType.Metrics:
+                        hubContext.Clients.All.receiveMetrics((MetricsSnapshot)message.Data);
+                        break;
+
+                    case BroadcastType.SimulationStarted:
+                        var startArgs = (SimulationEventArgs)message.Data;
+                        Logger.Debug("Broadcast SimulationStarted: {0} {1}", startArgs.Type, startArgs.SimulationId);
+                        hubContext.Clients.All.simulationStarted(startArgs.Type.ToString(), startArgs.SimulationId);
+                        break;
+
+                    case BroadcastType.SimulationCompleted:
+                        var completeArgs = (SimulationEventArgs)message.Data;
+                        Logger.Debug("Broadcast SimulationCompleted: {0} {1}", completeArgs.Type, completeArgs.SimulationId);
+                        hubContext.Clients.All.simulationCompleted(completeArgs.Type.ToString(), completeArgs.SimulationId);
+                        break;
+
+                    case BroadcastType.Latency:
+                        hubContext.Clients.All.receiveLatency((LatencyMeasurement)message.Data);
+                        break;
+
+                    case BroadcastType.SlowRequestLatency:
+                        hubContext.Clients.All.receiveSlowRequestLatency((SlowRequestLatencyData)message.Data);
+                        break;
+
+                    case BroadcastType.LoadTestStats:
+                        hubContext.Clients.All.receiveLoadTestStats((LoadTestStatsData)message.Data);
+                        break;
+
+                    case BroadcastType.IdleState:
+                        hubContext.Clients.All.receiveIdleState((IdleStateData)message.Data);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Error initiating broadcast for {0} message", message.Type);
+            }
+        }
+
+        private void OnMetricsCollected(object sender, MetricsSnapshot snapshot)
+        {
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.Metrics, snapshot));
+        }
+
+        private void OnSimulationStarted(object sender, SimulationEventArgs e)
+        {
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.SimulationStarted, e));
+        }
+
+        private void OnSimulationCompleted(object sender, SimulationEventArgs e)
+        {
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.SimulationCompleted, e));
+        }
+
+        private void OnGoingIdle(object sender, EventArgs e)
+        {
+            var idleData = new IdleStateData
+            {
+                IsIdle = true,
+                Message = "Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.",
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.IdleState, idleData));
+        }
+
+        private void OnWakingUp(object sender, EventArgs e)
+        {
+            var idleData = new IdleStateData
+            {
+                IsIdle = false,
+                Message = "App waking up from idle state. There may be gaps in diagnostics and logs.",
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.IdleState, idleData));
+        }
+
+        /// <summary>
+        /// Message types for the broadcast queue.
+        /// </summary>
+        private enum BroadcastType
+        {
+            Metrics,
+            SimulationStarted,
+            SimulationCompleted,
+            Latency,
+            SlowRequestLatency,
+            LoadTestStats,
+            IdleState
+        }
+
+        /// <summary>
+        /// Wrapper for broadcast messages in the queue.
+        /// </summary>
+        private class BroadcastMessage
+        {
+            public BroadcastType Type { get; private set; }
+            public object Data { get; private set; }
+
+            public BroadcastMessage(BroadcastType type, object data)
+            {
+                Type = type;
+                Data = data;
+            }
+        }
+
+        /// <summary>
+        /// Queues a latency measurement for broadcast.
+        /// </summary>
+        public void QueueLatencyBroadcast(LatencyMeasurement measurement)
+        {
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.Latency, measurement));
+        }
+
+        /// <summary>
+        /// Queues slow request latency data for broadcast.
+        /// </summary>
+        public void QueueSlowRequestLatencyBroadcast(SlowRequestLatencyData data)
+        {
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.SlowRequestLatency, data));
+        }
+
+        /// <summary>
+        /// Queues load test stats for broadcast.
+        /// </summary>
+        public void QueueLoadTestStatsBroadcast(LoadTestStatsData data)
+        {
+            _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.LoadTestStats, data));
         }
     }
-    
-    private Task FireSimulationStarted(SimulationEventArgs args)
-    {
-        _logger.LogDebug("Broadcast SimulationStarted: {Type} {Id}", args.Type, args.SimulationId);
-        return _hubContext.Clients.All.SimulationStarted(args.Type.ToString(), args.SimulationId);
-    }
-    
-    private Task FireSimulationCompleted(SimulationEventArgs args)
-    {
-        _logger.LogDebug("Broadcast SimulationCompleted: {Type} {Id}", args.Type, args.SimulationId);
-        return _hubContext.Clients.All.SimulationCompleted(args.Type.ToString(), args.SimulationId);
-    }
-
-    private void OnMetricsCollected(object? sender, MetricsSnapshot snapshot)
-    {
-        // Queue message - don't block if queue is full (drop oldest metrics)
-        if (!_messageQueue.TryAdd(new BroadcastMessage(BroadcastType.Metrics, snapshot)))
-        {
-            _logger.LogTrace("Broadcast queue full, dropping metrics update");
-        }
-    }
-
-    private void OnSimulationStarted(object? sender, SimulationEventArgs e) =>
-        _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.SimulationStarted, e));
-
-    private void OnSimulationCompleted(object? sender, SimulationEventArgs e) =>
-        _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.SimulationCompleted, e));
-
-    private void OnGoingIdle(object? sender, EventArgs e)
-    {
-        var idleData = new IdleStateData
-        {
-            IsIdle = true,
-            Message = "Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.",
-            Timestamp = DateTimeOffset.UtcNow
-        };
-        _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.IdleState, idleData));
-    }
-
-    private void OnWakingUp(object? sender, EventArgs e)
-    {
-        var idleData = new IdleStateData
-        {
-            IsIdle = false,
-            Message = "App waking up from idle state. There may be gaps in diagnostics and logs.",
-            Timestamp = DateTimeOffset.UtcNow
-        };
-        _messageQueue.TryAdd(new BroadcastMessage(BroadcastType.IdleState, idleData));
-    }
-    
-    /// <summary>
-    /// Message types for the broadcast queue.
-    /// </summary>
-    private enum BroadcastType
-    {
-        Metrics,
-        SimulationStarted,
-        SimulationCompleted,
-        Latency,
-        SlowRequestLatency,
-        LoadTestStats,
-        IdleState
-    }
-    
-    /// <summary>
-    /// Wrapper for broadcast messages in the queue.
-    /// </summary>
-    private record BroadcastMessage(BroadcastType Type, object? Data);
 }

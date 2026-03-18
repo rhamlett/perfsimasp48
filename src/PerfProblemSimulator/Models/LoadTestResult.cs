@@ -42,7 +42,10 @@
  * =============================================================================
  */
 
-namespace PerfProblemSimulator.Models;
+using System;
+
+namespace PerfProblemSimulator.Models
+{
 
 /// <summary>
 /// Result returned from load test endpoint containing timing and diagnostic information.
@@ -206,7 +209,7 @@ public class LoadTestResult
     /// TaskCanceledException, OutOfMemoryException, StackOverflowException
     /// </para>
     /// </remarks>
-    public string? ExceptionType { get; set; }
+    public string ExceptionType { get; set; }
 
     /// <summary>
     /// UTC timestamp when the result was generated.
@@ -218,4 +221,5 @@ public class LoadTestResult
     /// </para>
     /// </remarks>
     public DateTimeOffset Timestamp { get; set; }
+}
 }

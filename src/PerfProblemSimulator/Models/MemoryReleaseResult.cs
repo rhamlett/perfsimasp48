@@ -1,8 +1,10 @@
-namespace PerfProblemSimulator.Models;
+using System;
 
-/// <summary>
-/// Result of releasing allocated memory blocks.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Result of releasing allocated memory blocks.
+    /// </summary>
 /// <remarks>
 /// <para>
 /// <strong>PURPOSE:</strong>
@@ -33,12 +35,12 @@ public class MemoryReleaseResult
     /// <summary>
     /// Number of memory blocks that were released.
     /// </summary>
-    public int ReleasedBlockCount { get; init; }
+    public int ReleasedBlockCount { get; set; }
 
     /// <summary>
     /// Total memory released in bytes.
     /// </summary>
-    public long ReleasedBytes { get; init; }
+    public long ReleasedBytes { get; set; }
 
     /// <summary>
     /// Total memory released in megabytes.
@@ -48,12 +50,12 @@ public class MemoryReleaseResult
     /// <summary>
     /// Whether garbage collection was forced after release.
     /// </summary>
-    public bool ForcedGarbageCollection { get; init; }
+    public bool ForcedGarbageCollection { get; set; }
 
     /// <summary>
     /// Human-readable message about the release operation.
     /// </summary>
-    public required string Message { get; init; }
+    public string Message { get; set; }
 }
 
 /// <summary>
@@ -64,12 +66,12 @@ public class MemoryStatus
     /// <summary>
     /// Number of currently allocated memory blocks.
     /// </summary>
-    public int AllocatedBlocksCount { get; init; }
+    public int AllocatedBlocksCount { get; set; }
 
     /// <summary>
     /// Total size of all allocated blocks in bytes.
     /// </summary>
-    public long TotalAllocatedBytes { get; init; }
+    public long TotalAllocatedBytes { get; set; }
 
     /// <summary>
     /// Total size of all allocated blocks in megabytes.
@@ -79,10 +81,11 @@ public class MemoryStatus
     /// <summary>
     /// When the oldest block was allocated (null if no blocks).
     /// </summary>
-    public DateTimeOffset? OldestAllocationAt { get; init; }
+    public DateTimeOffset? OldestAllocationAt { get; set; }
 
     /// <summary>
     /// When the newest block was allocated (null if no blocks).
     /// </summary>
-    public DateTimeOffset? NewestAllocationAt { get; init; }
+    public DateTimeOffset? NewestAllocationAt { get; set; }
+}
 }

@@ -1,61 +1,64 @@
-namespace PerfProblemSimulator.Models;
+using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
-/// <summary>
-/// Lightweight metrics snapshot for real-time SignalR updates.
-/// </summary>
+namespace PerfProblemSimulator.Models
+{
+    /// <summary>
+    /// Lightweight metrics snapshot for real-time SignalR updates.
+    /// </summary>
 /// <remarks>
 /// <para>
-/// <strong>Educational Note:</strong> This is a <c>readonly record struct</c> for maximum
-/// efficiency when broadcasting to many SignalR clients. Value types avoid heap allocations,
-/// and the readonly modifier ensures immutability for thread-safe access.
+/// <strong>Educational Note:</strong> This is a struct for maximum
+/// efficiency when broadcasting to many SignalR clients. Value types avoid heap allocations.
 /// </para>
 /// </remarks>
-public readonly record struct MetricsSnapshot
+[JsonObject(NamingStrategyType = typeof(CamelCaseNamingStrategy))]
+public struct MetricsSnapshot
 {
     /// <summary>
     /// When this snapshot was captured.
     /// </summary>
-    public DateTimeOffset Timestamp { get; init; }
+    public DateTimeOffset Timestamp { get; set; }
 
     /// <summary>
     /// Current CPU usage percentage (0-100).
     /// </summary>
-    public double CpuPercent { get; init; }
+    public double CpuPercent { get; set; }
 
     /// <summary>
     /// Process working set in megabytes.
     /// </summary>
-    public double WorkingSetMb { get; init; }
+    public double WorkingSetMb { get; set; }
 
     /// <summary>
     /// GC heap size in megabytes.
     /// </summary>
-    public double GcHeapMb { get; init; }
+    public double GcHeapMb { get; set; }
 
     /// <summary>
     /// Total available memory on the machine in megabytes.
     /// </summary>
     /// <remarks>
-    /// This value comes from <see cref="GC.GetGCMemoryInfo()"/> and represents
-    /// the total physical memory available to the GC. Used by the dashboard
-    /// to calculate dynamic warning thresholds for memory usage.
+    /// This value represents the total physical memory available.
+    /// Used by the dashboard to calculate dynamic warning thresholds for memory usage.
     /// </remarks>
-    public double TotalAvailableMemoryMb { get; init; }
+    public double TotalAvailableMemoryMb { get; set; }
 
     /// <summary>
     /// Current thread pool thread count.
     /// </summary>
-    public int ThreadPoolThreads { get; init; }
+    public int ThreadPoolThreads { get; set; }
 
     /// <summary>
     /// Number of work items waiting in the thread pool queue.
     /// </summary>
-    public long ThreadPoolQueueLength { get; init; }
+    public long ThreadPoolQueueLength { get; set; }
 
     /// <summary>
     /// Number of currently active simulations.
     /// </summary>
-    public int ActiveSimulationCount { get; init; }
+    public int ActiveSimulationCount { get; set; }
 
     /// <summary>
     /// The process ID of the running application.
@@ -65,5 +68,6 @@ public readonly record struct MetricsSnapshot
     /// changes between metrics updates, it indicates the application crashed and
     /// was restarted (e.g., due to OOM, StackOverflow, or Azure auto-restart).
     /// </remarks>
-    public int ProcessId { get; init; }
+    public int ProcessId { get; set; }
+}
 }
