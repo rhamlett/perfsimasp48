@@ -162,8 +162,7 @@ namespace PerfProblemSimulator.Controllers
             return Ok(new BuildInfoResponse
             {
                 BuildTimestamp = buildTimestamp,
-                AssemblyVersion = assembly.GetName().Version?.ToString(),
-                EnvironmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"
+                AssemblyVersion = assembly.GetName().Version?.ToString()
             });
         }
     }
@@ -268,10 +267,5 @@ namespace PerfProblemSimulator.Controllers
         /// Assembly version of the application.
         /// </summary>
         public string AssemblyVersion { get; set; }
-
-        /// <summary>
-        /// Current environment name (Development, Staging, Production).
-        /// </summary>
-        public string EnvironmentName { get; set; }
     }
 }
