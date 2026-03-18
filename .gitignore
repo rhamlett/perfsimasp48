@@ -104,6 +104,10 @@ PublishProfiles/
 web.*.config
 *.azurePubxml
 
+# Azure App Service logs
+applogs/
+applogs.zip
+
 # =============================================================================
 # Operating System
 # =============================================================================

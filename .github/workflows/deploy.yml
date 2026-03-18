@@ -18,19 +18,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.x'
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
 
-      - name: Restore dependencies
-        run: dotnet restore src/PerfProblemSimulator/PerfProblemSimulator.csproj
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
 
-      - name: Publish
-        run: dotnet publish src/PerfProblemSimulator/PerfProblemSimulator.csproj --configuration Release --output ./publish
+      - name: Restore NuGet packages
+        run: nuget restore PerfProblemSimulator.slnx
 
-      - name: List publish contents
-        run: Get-ChildItem -Path ./publish -Recurse | Select-Object FullName
+      - name: Build
+        run: msbuild src/PerfProblemSimulator/PerfProblemSimulator.csproj /p:Configuration=Release /p:OutputPath=..\..\build\bin
+
+      - name: Prepare deployment package
+        shell: pwsh
+        run: |
+          # Create deployment structure for IIS
+          New-Item -ItemType Directory -Path ./deploy/bin -Force
+          
+          # Copy DLLs to bin folder
+          Copy-Item -Path ./build/bin/*.dll -Destination ./deploy/bin/ -Force
+          Copy-Item -Path ./build/bin/*.pdb -Destination ./deploy/bin/ -Force -ErrorAction SilentlyContinue
+          Copy-Item -Path ./build/bin/*.config -Destination ./deploy/bin/ -Force -ErrorAction SilentlyContinue
+          
+          # Copy web.config to root
+          Copy-Item -Path ./src/PerfProblemSimulator/web.config -Destination ./deploy/ -Force
+          
+          # Copy Global.asax to root
+          Copy-Item -Path ./src/PerfProblemSimulator/Global.asax -Destination ./deploy/ -Force
+          
+          # Copy NLog.config to bin (or root, depending on config)
+          Copy-Item -Path ./src/PerfProblemSimulator/NLog.config -Destination ./deploy/ -Force
+          
+          # Copy wwwroot static files
+          Copy-Item -Path ./src/PerfProblemSimulator/wwwroot -Destination ./deploy/ -Recurse -Force
+          
+          # List deployment contents
+          Get-ChildItem -Path ./deploy -Recurse | Select-Object FullName
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -43,7 +67,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: perfsimasp48
-          package: ./publish
+          package: ./deploy
 
       - name: Logout from Azure
         run: az logout
