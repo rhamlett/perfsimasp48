@@ -1,0 +1,476 @@
+# Performance Problem Simulator
+
+An educational Azure App Service application that **intentionally creates performance problems** for learning and demonstration purposes.
+
+## 🎯 Purpose
+
+This application is designed to help developers and DevOps engineers:
+
+- **Learn** how to diagnose common performance issues in Azure App Service
+- **Practice** using Azure monitoring and diagnostic tools
+- **Demonstrate** performance anti-patterns in a controlled environment
+- **Train** support teams on identifying and resolving performance problems
+
+## ⚠️ Warning
+
+**This application intentionally creates performance problems!**
+
+- 🔥 **CPU stress** - Creates dedicated threads running spin loops to consume all CPU cores
+- 📊 **Memory pressure** - Allocates and pins memory blocks to increase working set
+- 🧵 **Thread pool starvation** - Uses sync-over-async anti-patterns to block thread pool threads
+- 🐢 **Slow requests** - Generates long-running requests with sync-over-async patterns for CLR Profiler analysis
+- 💥 **Application crashes** - Triggers fatal crashes for testing Azure Crash Monitoring and memory dumps
+- ❌ **Failed requests** - Generates HTTP 5xx errors visible in AppLens and Application Insights
+
+**Only deploy this application in isolated, non-production environments.**
+
+## 🚀 Quick Start
+
+### Run Locally
+
+```bash
+# Clone the repository
+git clone https://github.com/rhamlett/perfsimasp48.git
+cd perfsimasp48
+
+# Restore and build
+dotnet build
+
+# Run the application
+dotnet run --project src/PerfProblemSimulator
+
+# Open in browser
+# Dashboard: http://localhost:5000
+# Swagger: http://localhost:5000/swagger
+```
+
+### Run Tests
+
+```bash
+# Run all tests
+dotnet test
+
+# Run with coverage
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+## 📊 Dashboard
+
+The application includes a real-time dashboard at the root URL that shows:
+
+- **CPU usage** - Current processor utilization
+- **Memory** - Working set and GC heap sizes
+- **Thread pool** - Active threads and queue length
+- **Request latency** - Real-time probe response time (shows impact of thread pool starvation)
+- **Active simulations** - Currently running problem simulations
+
+The dashboard uses SignalR for real-time updates and includes controls to trigger each type of simulation.
+
+### Metric Color Indicators
+
+The CPU and Memory metric tiles use dynamic color coding based on utilization percentage:
+
+| Color | Utilization | Status |
+|-------|-------------|--------|
+| Black (default) | 0-60% | Normal |
+| Yellow | 60-80% | Warning - elevated usage |
+| Red | >80% | Danger - potential resource exhaustion |
+
+**Note:** Memory thresholds are calculated dynamically based on the actual total available memory reported by the server, ensuring accurate warnings regardless of the machine's RAM configuration.
+
+## 🔌 API Endpoints
+
+### Health & Monitoring
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Basic health check |
+| `/api/health/status` | GET | Detailed health with active simulations |
+| `/api/health/probe` | GET | Lightweight probe for latency measurement |
+| `/api/health/build` | GET | Build information and assembly version |
+| `/api/metrics/current` | GET | Latest metrics snapshot |
+| `/api/metrics/health` | GET | Detailed health status with warnings |
+| `/api/admin/stats` | GET | Simulation and resource statistics |
+
+### CPU Stress Simulation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/cpu/trigger-high-cpu` | POST | Trigger CPU stress |
+
+**Request body:**
+```json
+{
+  "durationSeconds": 30,
+  "targetPercentage": 100
+}
+```
+
+- `durationSeconds`: How long to run (default: 30)
+- `targetPercentage`: Target CPU usage 1-100 (default: 100)
+
+### Memory Pressure Simulation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/memory/allocate-memory` | POST | Allocate memory block |
+| `/api/memory/release-memory` | POST | Release all allocated memory |
+| `/api/memory/status` | GET | Get current memory allocation status |
+
+**Request body (allocate):**
+```json
+{
+  "sizeMegabytes": 100
+}
+```
+
+### Thread Pool Starvation Simulation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/threadblock/trigger-sync-over-async` | POST | Trigger thread blocking |
+
+**Request body:**
+```json
+{
+  "delayMilliseconds": 5000,
+  "concurrentRequests": 100
+}
+```
+
+### Slow Request Simulation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/slowrequest/start` | POST | Start slow request simulation |
+| `/api/slowrequest/stop` | POST | Stop slow request simulation |
+| `/api/slowrequest/status` | GET | Get current simulation status |
+| `/api/slowrequest/scenarios` | GET | Get scenario descriptions for CLR Profiler |
+
+**Request body (start):**
+```json
+{
+  "requestDurationSeconds": 25,
+  "intervalSeconds": 2,
+  "maxRequests": 10
+}
+```
+
+The slow request simulator generates requests using three different sync-over-async patterns:
+- **SimpleSyncOverAsync**: Blocking calls - look for `FetchDataSync_BLOCKING_HERE`, `ProcessDataSync_BLOCKING_HERE`, `SaveDataSync_BLOCKING_HERE` in traces
+- **NestedSyncOverAsync**: Sync methods that block internally - look for `*_BLOCKS_INTERNALLY` methods
+- **DatabasePattern**: Simulated database/HTTP blocking - look for `*Sync_SYNC_BLOCK` methods
+
+### Failed Request Simulation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/failedrequest/start` | POST | Start generating HTTP 500 errors |
+| `/api/failedrequest/stop` | POST | Stop the simulation |
+| `/api/failedrequest/status` | GET | Get current simulation status |
+
+**Request body (start):**
+```json
+{
+  "requestCount": 10
+}
+```
+
+- `requestCount`: Number of HTTP 500 errors to generate (default: 10)
+
+Each failed request throws a random exception type (NullReferenceException, TimeoutException, InvalidOperationException, etc.) visible in AppLens and Application Insights.
+
+### Crash Simulation
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/crash/trigger` | POST | Trigger a crash with options |
+| `/api/crash/now` | GET/POST | Immediate synchronous crash (best for Azure Crash Monitoring) |
+| `/api/crash/types` | GET | List available crash types |
+| `/api/crash/failfast` | POST | Quick FailFast crash |
+| `/api/crash/stackoverflow` | POST | Quick StackOverflow crash |
+
+**Request body (trigger):**
+```json
+{
+  "crashType": "FailFast",
+  "delaySeconds": 3,
+  "message": "Optional crash message"
+}
+```
+
+**Available crash types:** `FailFast`, `StackOverflow`, `UnhandledException`, `AccessViolation`, `OutOfMemory`
+
+### Admin Operations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/admin/stats` | GET | Get current simulation statistics |
+
+### Azure Load Testing Endpoint
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/loadtest` | GET | Execute load test with configurable parameters |
+| `/api/loadtest/stats` | GET | Get load test statistics |
+
+**Query Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `workIterations` | 200 | SHA256 iterations per CPU work cycle |
+| `bufferSizeKb` | 20000 | Memory buffer held for request duration (KB) |
+| `baselineDelayMs` | 500 | Minimum request duration (ms) |
+| `softLimit` | 25 | Concurrent requests before degradation |
+| `degradationFactor` | 500 | Delay ms added per request over limit |
+
+**Example URLs:**
+```bash
+# Default parameters (tuned for Premium0V3)
+GET /api/loadtest
+
+# Custom CPU stress
+GET /api/loadtest?workIterations=10000&bufferSizeKb=2000
+
+# Thread pool only (no CPU work)
+GET /api/loadtest?workIterations=0&bufferSizeKb=100
+```
+
+**What it tests:**
+- **CPU** - Sustained SHA256 cycles (~50% CPU per thread)
+- **Memory** - Buffers held for entire request duration
+- **Thread Pool** - Graceful degradation under concurrent load
+- **Timeouts** - Random exceptions after 120s (20% probability)
+
+## ⏱️ Request Latency Monitor
+
+The dashboard includes a **Request Latency Monitor** that demonstrates how thread pool starvation affects real-world request processing.
+
+### How It Works
+
+- A dedicated background thread (not from the thread pool) continuously probes `/api/health/probe`
+- Latency is measured end-to-end: request sent → response received
+- Results are broadcast via SignalR to the dashboard in real-time
+
+### What You'll Observe
+
+| Scenario | Latency (Queue + Processing) | Status | Explanation |
+|----------|------------------------------|--------|-------------|
+| Normal operation | < 150ms | 🟢 Good | Thread pool threads available |
+| Mild starvation | 150ms - 1s | 🟡 Degraded | Requests beginning to queue |
+| Severe starvation | > 1s | 🔴 Severe | Significant queuing delay |
+| Timeout | 30s | 🔴 Critical | No thread became available within timeout |
+
+### Why This Matters
+
+During thread pool starvation, CPU and memory metrics often look normal, but users experience severe latency. The latency monitor makes this invisible problem **visible** - you can watch response times spike from milliseconds to seconds when triggering the sync-over-async simulation.
+
+## 🔧 Configuration
+
+Configuration is managed through `appsettings.json`:
+
+```json
+{
+  "ProblemSimulator": {
+    "MetricsCollectionIntervalMs": 250,
+    "LatencyProbeIntervalMs": 200
+  }
+}
+```
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `MetricsCollectionIntervalMs` | How often CPU/Memory/Thread metrics are collected | `250` |
+| `LatencyProbeIntervalMs` | Server-side health probe interval (also configurable via `HEALTH_PROBE_RATE` env var) | `200` |
+
+**Note:** This application is designed to be fully breakable for educational purposes. There are no safety limits on resource consumption — simulations can run until the application crashes or resources are exhausted.
+
+### Environment Variables
+
+The following environment variables can be configured to customize application behavior. These are optional and primarily useful when deploying to Azure App Service.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HEALTH_PROBE_RATE` | Health probe interval in milliseconds. Controls how often the server sends latency probes through the Azure frontend. Minimum 100ms. | `200` |
+| `IDLE_TIMEOUT_MINUTES` | Minutes of inactivity before suspending health probes. Reduces network traffic and Application Insights telemetry when idle. | `20` |
+| `PAGE_FOOTER` | Custom HTML footer text displayed at the bottom of the dashboard. Supports HTML links for attribution. | (empty) |
+
+#### HEALTH_PROBE_RATE
+
+Controls the interval between server-side health probes. All probes are routed through the Azure frontend to capture realistic end-to-end latency including network hops.
+
+- **Default:** 200ms (5 probes/sec)
+- **Safety limit:** Minimum 100ms to prevent probe overlap
+- **Use case:** Increase if CLR profiling shows probe requests overlapping; decrease for finer granularity
+
+**Setting via Azure CLI:**
+```bash
+az webapp config appsettings set \
+    --resource-group rg-perf-simulator \
+    --name your-app-name \
+    --settings HEALTH_PROBE_RATE=400
+```
+
+#### IDLE_TIMEOUT_MINUTES
+
+When the application is idle (no dashboard connections or load test requests), health probes are automatically suspended to reduce unnecessary network traffic to Azure's frontend, AppLens, and Application Insights.
+
+- **Default:** 20 minutes
+- **Wake-up:** Simply reload the dashboard or send any request
+- **Activity sources:** Dashboard connections, load test requests
+
+**Setting via Azure CLI:**
+```bash
+az webapp config appsettings set \
+    --resource-group rg-perf-simulator \
+    --name your-app-name \
+    --settings IDLE_TIMEOUT_MINUTES=30
+```
+
+#### PAGE_FOOTER
+
+The `PAGE_FOOTER` environment variable allows you to customize the footer credits displayed on the dashboard. This is useful for attributing tools, teams, or linking to relevant resources.
+
+**Example Value:**
+```
+Created by <a href="https://speckit.org/" target="_blank">SpecKit</a> and <a href="https://github.com/copilot" target="_blank">Github Copilot</a>
+```
+
+**Setting via Azure CLI:**
+```bash
+az webapp config appsettings set \
+    --resource-group rg-perf-simulator \
+    --name your-app-name \
+    --settings PAGE_FOOTER='Created by <a href="https://speckit.org/" target="_blank">SpecKit</a> and <a href="https://github.com/copilot" target="_blank">Github Copilot</a>'
+```
+
+**Setting Locally (PowerShell):**
+```powershell
+$env:PAGE_FOOTER = 'Created by <a href="https://speckit.org/" target="_blank">SpecKit</a> and <a href="https://github.com/copilot" target="_blank">Github Copilot</a>'
+```
+
+**Setting Locally (Bash):**
+```bash
+export PAGE_FOOTER='Created by <a href="https://speckit.org/" target="_blank">SpecKit</a> and <a href="https://github.com/copilot" target="_blank">Github Copilot</a>'
+```
+
+The footer is retrieved via the `/api/config/footer` endpoint and rendered in the dashboard's footer section. If `PAGE_FOOTER` is not set, the footer credits section is hidden.
+
+## ☁️ Azure Deployment
+
+### Using Azure CLI
+
+```bash
+# Login to Azure
+az login
+
+# Create resource group
+az group create --name rg-perf-simulator --location eastus
+
+# Create App Service plan
+az appservice plan create \
+  --name asp-perf-simulator \
+  --resource-group rg-perf-simulator \
+  --sku B1 \
+  --is-linux
+
+# Create Web App
+az webapp create \
+  --name your-unique-app-name \
+  --resource-group rg-perf-simulator \
+  --plan asp-perf-simulator \
+  --runtime "DOTNETCORE:10.0"
+
+# Deploy
+cd src/PerfProblemSimulator
+dotnet publish -c Release
+az webapp deploy \
+  --resource-group rg-perf-simulator \
+  --name your-unique-app-name \
+  --src-path bin/Release/net10.0/publish
+```
+
+## 🔍 Using Azure Diagnostics
+
+This application is designed to work with Azure App Service diagnostics:
+
+### Recommended Diagnostic Tools
+
+1. **Diagnose and Solve Problems** - App Service blade for automated diagnosis
+2. **Application Insights** - For detailed telemetry and performance monitoring
+3. **Process Explorer** - For real-time process monitoring
+4. **CPU Profiling** - Capture and analyze CPU traces
+5. **Memory Dumps** - Analyze memory allocations
+
+See the [Azure Diagnostics Guide](/azure-monitoring-guide.html) in the application for detailed instructions on diagnosing each type of performance problem.
+
+## 📐 Architecture
+
+```
+src/PerfProblemSimulator/
+├── Controllers/          # API endpoints
+│   ├── AdminController.cs
+│   ├── CpuController.cs
+│   ├── CrashController.cs
+│   ├── HealthController.cs
+│   ├── LoadTestController.cs
+│   ├── MemoryController.cs
+│   ├── MetricsController.cs
+│   ├── SlowRequestController.cs
+│   └── ThreadBlockController.cs
+├── Services/             # Business logic
+│   ├── CpuStressService.cs
+│   ├── CrashService.cs
+│   ├── LatencyProbeService.cs
+│   ├── LoadTestService.cs
+│   ├── MemoryPressureService.cs
+│   ├── MetricsBroadcastService.cs
+│   ├── MetricsCollector.cs
+│   ├── SimulationTracker.cs
+│   ├── SlowRequestService.cs
+│   └── ThreadBlockService.cs
+├── Hubs/                 # SignalR for real-time updates
+│   ├── MetricsHub.cs
+│   └── IMetricsClient.cs
+├── Models/               # Data transfer objects
+└── wwwroot/              # SPA dashboard
+    ├── index.html
+    ├── documentation.html
+    ├── azure-monitoring-guide.html
+    ├── azure-deployment.html
+    ├── css/dashboard.css
+    └── js/dashboard.js
+```
+
+## 🧪 Testing
+
+The project includes comprehensive unit and integration tests:
+
+```bash
+# Run all tests
+dotnet test
+
+# Run with verbose output
+dotnet test --logger "console;verbosity=detailed"
+
+# Run specific test category
+dotnet test --filter "Category=Unit"
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 🙏 Acknowledgments
+
+- Designed for educational use in Azure App Service training
+- Inspired by common performance anti-patterns encountered in production
+- Built with .NET 10.0 and ASP.NET Core

@@ -1,0 +1,269 @@
+using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.AspNetCore.Mvc;
+using PerfProblemSimulator.Services;
+using System.Reflection;
+
+namespace PerfProblemSimulator.Controllers;
+
+/// <summary>
+/// Controller for application health checks.
+/// Provides endpoints that remain responsive even under stress conditions.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>Educational Note:</strong> Health endpoints are critical for load balancers,
+/// orchestrators (like Kubernetes), and monitoring systems. Azure App Service uses
+/// health check endpoints to determine if an instance should receive traffic.
+/// </para>
+/// <para>
+/// This controller is designed to remain responsive even during performance problem
+/// simulations. It provides both a simple liveness probe (/api/health) and a more
+/// detailed status endpoint (/api/health/status) that includes information about
+/// active simulations.
+/// </para>
+/// </remarks>
+[ApiController]
+[Route("api/[controller]")]
+[Produces("application/json")]
+[RequestTimeout("NoTimeout")] // Health endpoints must always respond, never timeout
+public class HealthController : ControllerBase
+{
+    private readonly ISimulationTracker _simulationTracker;
+    private readonly ILogger<HealthController> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="HealthController"/> class.
+    /// </summary>
+    /// <param name="simulationTracker">Service for tracking active simulations.</param>
+    /// <param name="logger">Logger for health check events.</param>
+    public HealthController(
+        ISimulationTracker simulationTracker,
+        ILogger<HealthController> logger)
+    {
+        _simulationTracker = simulationTracker ?? throw new ArgumentNullException(nameof(simulationTracker));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Simple liveness probe endpoint.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Returns a simple "Healthy" response to indicate the application is running.
+    /// This endpoint should always respond quickly, regardless of system load.
+    /// </para>
+    /// <para>
+    /// <strong>Azure App Service Usage:</strong> Configure this as the health probe path
+    /// in your App Service configuration to enable automatic instance replacement
+    /// when the application becomes unresponsive.
+    /// </para>
+    /// </remarks>
+    /// <response code="200">Application is healthy and responding to requests.</response>
+    [HttpGet]
+    [ProducesResponseType(typeof(HealthResponse), StatusCodes.Status200OK)]
+    public IActionResult Get()
+    {
+        return Ok(new HealthResponse
+        {
+            Status = "Healthy",
+            Timestamp = DateTimeOffset.UtcNow
+        });
+    }
+
+    /// <summary>
+    /// Detailed status endpoint including active simulation information.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Provides more detailed health information including the count and types
+    /// of any currently running simulations. Useful for monitoring dashboards
+    /// that need to understand the current state of the simulator.
+    /// </para>
+    /// </remarks>
+    /// <response code="200">Returns detailed health status.</response>
+    [HttpGet("status")]
+    [ProducesResponseType(typeof(DetailedHealthResponse), StatusCodes.Status200OK)]
+    public IActionResult GetStatus()
+    {
+        var activeSimulations = _simulationTracker.GetActiveSimulations();
+
+        return Ok(new DetailedHealthResponse
+        {
+            Status = "Healthy",
+            Timestamp = DateTimeOffset.UtcNow,
+            ActiveSimulationCount = activeSimulations.Count,
+            ActiveSimulations = activeSimulations
+                .Select(s => new ActiveSimulationSummary
+                {
+                    Id = s.Id,
+                    Type = s.Type.ToString(),
+                    StartedAt = s.StartedAt,
+                    RunningDurationSeconds = (int)(DateTimeOffset.UtcNow - s.StartedAt).TotalSeconds
+                })
+                .ToList()
+        });
+    }
+
+    /// <summary>
+    /// Lightweight probe endpoint for latency measurement.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Educational Note:</strong> This endpoint is designed for measuring
+    /// request processing latency. It does minimal work - just returns a timestamp.
+    /// During thread pool starvation, even this simple endpoint will show increased
+    /// latency because the request must wait for a thread pool thread to process it.
+    /// </para>
+    /// <para>
+    /// Compare the response time of this endpoint before and during thread pool
+    /// starvation to see the dramatic impact on user-perceived performance.
+    /// </para>
+    /// </remarks>
+    /// <response code="200">Returns probe timestamp for latency calculation.</response>
+    [HttpGet("probe")]
+    [ProducesResponseType(typeof(ProbeResponse), StatusCodes.Status200OK)]
+    public IActionResult Probe()
+    {
+        return Ok(new ProbeResponse
+        {
+            ServerTimestamp = DateTimeOffset.UtcNow,
+            ThreadPoolThreads = ThreadPool.ThreadCount,
+            PendingWorkItems = ThreadPool.PendingWorkItemCount
+        });
+    }
+
+    /// <summary>
+    /// Returns build information including the build timestamp.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>Educational Note:</strong> The build timestamp is embedded in the assembly
+    /// during compilation via MSBuild. This provides an accurate record of when the
+    /// deployed code was built, useful for debugging and deployment verification.
+    /// </para>
+    /// </remarks>
+    /// <response code="200">Returns build information.</response>
+    [HttpGet("build")]
+    [ProducesResponseType(typeof(BuildInfoResponse), StatusCodes.Status200OK)]
+    public IActionResult GetBuildInfo()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var buildTimestamp = assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => a.Key == "BuildTimestamp")?.Value;
+
+        return Ok(new BuildInfoResponse
+        {
+            BuildTimestamp = buildTimestamp,
+            AssemblyVersion = assembly.GetName().Version?.ToString(),
+            EnvironmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"
+        });
+    }
+}
+
+/// <summary>
+/// Simple health check response.
+/// </summary>
+public class HealthResponse
+{
+    /// <summary>
+    /// Health status. Always "Healthy" if the endpoint responds.
+    /// </summary>
+    public required string Status { get; init; }
+
+    /// <summary>
+    /// When this health check was performed.
+    /// </summary>
+    public DateTimeOffset Timestamp { get; init; }
+}
+
+/// <summary>
+/// Detailed health check response including simulation state.
+/// </summary>
+public class DetailedHealthResponse : HealthResponse
+{
+    /// <summary>
+    /// Number of currently active simulations.
+    /// </summary>
+    public int ActiveSimulationCount { get; init; }
+
+    /// <summary>
+    /// Summary of each active simulation.
+    /// </summary>
+    public List<ActiveSimulationSummary> ActiveSimulations { get; init; } = [];
+}
+
+/// <summary>
+/// Summary information about an active simulation.
+/// </summary>
+public class ActiveSimulationSummary
+{
+    /// <summary>
+    /// Unique identifier for the simulation.
+    /// </summary>
+    public Guid Id { get; init; }
+
+    /// <summary>
+    /// Type of simulation (Cpu, Memory, ThreadBlock).
+    /// </summary>
+    public required string Type { get; init; }
+
+    /// <summary>
+    /// When the simulation started.
+    /// </summary>
+    public DateTimeOffset StartedAt { get; init; }
+
+    /// <summary>
+    /// How long the simulation has been running in seconds.
+    /// </summary>
+    public int RunningDurationSeconds { get; init; }
+}
+
+/// <summary>
+/// Response from the latency probe endpoint.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <strong>Educational Note:</strong> This response includes thread pool information
+/// to help correlate latency with thread pool state. During starvation, you'll see
+/// high pending work items and latency increasing together.
+/// </para>
+/// </remarks>
+public class ProbeResponse
+{
+    /// <summary>
+    /// Server timestamp when the probe was processed.
+    /// </summary>
+    public DateTimeOffset ServerTimestamp { get; init; }
+
+    /// <summary>
+    /// Current number of thread pool threads.
+    /// </summary>
+    public int ThreadPoolThreads { get; init; }
+
+    /// <summary>
+    /// Number of work items waiting in the thread pool queue.
+    /// </summary>
+    public long PendingWorkItems { get; init; }
+}
+
+/// <summary>
+/// Response containing build information.
+/// </summary>
+public class BuildInfoResponse
+{
+    /// <summary>
+    /// UTC timestamp when the application was built (ISO 8601 format).
+    /// </summary>
+    public string? BuildTimestamp { get; init; }
+
+    /// <summary>
+    /// Assembly version of the application.
+    /// </summary>
+    public string? AssemblyVersion { get; init; }
+
+    /// <summary>
+    /// Current environment name (Development, Staging, Production).
+    /// </summary>
+    public string? EnvironmentName { get; init; }
+}

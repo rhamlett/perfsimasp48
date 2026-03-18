@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Performance Problem Simulator - Web API Project
+    Common properties (TargetFramework, Nullable, ImplicitUsings) are inherited from Directory.Build.props
+  -->
+
+  <PropertyGroup>
+    <!-- Enable unsafe code for AccessViolation crash simulation -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    
+    <!-- 
+      Use InProcess hosting for Azure App Service.
+      This runs the app inside w3wp.exe (IIS worker process) instead of a separate dotnet.exe.
+      Azure Crash Monitoring monitors w3wp.exe, so InProcess is required for crash dump collection.
+    -->
+    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+  </PropertyGroup>
+
+  <!-- .NET 10 specific packages -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+  </ItemGroup>
+
+  <!-- .NET 8 specific packages -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
+  </ItemGroup>
+
+  <!-- Generate build timestamp as assembly metadata -->
+  <Target Name="SetBuildTimestamp" BeforeTargets="GetAssemblyAttributes">
+    <PropertyGroup>
+      <BuildTimestamp>$([System.DateTime]::UtcNow.ToString("o"))</BuildTimestamp>
+    </PropertyGroup>
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>BuildTimestamp</_Parameter1>
+        <_Parameter2>$(BuildTimestamp)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
+</Project>

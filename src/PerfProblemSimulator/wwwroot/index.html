@@ -1,0 +1,424 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Problem Simulator - .NET 10 on Windows - Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="css/dashboard.css?v=6">
+    <!-- Chart.js for real-time graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- SignalR client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <button id="hamburger-btn" class="hamburger-btn attention" aria-label="Open navigation menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
+                <defs>
+                    <radialGradient id="appservices-radial" cx="13428.81" cy="3518.86" r="56.67" gradientTransform="translate(-2005.33 -518.83) scale(0.15)" gradientUnits="userSpaceOnUse">
+                        <stop offset="0.18" stop-color="#5ea0ef"/>
+                        <stop offset="1" stop-color="#0078d4"/>
+                    </radialGradient>
+                    <linearGradient id="appservices-lin1" x1="4.4" y1="11.48" x2="4.37" y2="7.53" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin2" x1="10.13" y1="15.45" x2="10.13" y2="11.9" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin3" x1="14.18" y1="11.15" x2="14.18" y2="7.38" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                </defs>
+                <path d="M14.21,15.72A8.5,8.5,0,0,1,3.79,2.28l.09-.06a8.5,8.5,0,0,1,10.33,13.5" fill="url(#appservices-radial)"/>
+                <path d="M6.69,7.23A13,13,0,0,1,15.6,3.65a8.47,8.47,0,0,0-1.49-1.44,14.34,14.34,0,0,0-4.69,1.1A12.54,12.54,0,0,0,5.34,6.13,2.76,2.76,0,0,1,6.69,7.23Z" fill="#fff" opacity="0.6"/>
+                <path d="M2.48,10.65a17.86,17.86,0,0,0-.83,2.62,7.82,7.82,0,0,0,.62.92c.18.23.35.44.55.65A17.94,17.94,0,0,1,3.9,11.37,2.76,2.76,0,0,1,2.48,10.65Z" fill="#fff" opacity="0.6"/>
+                <path d="M3.46,6.11a12,12,0,0,1-.69-2.94,8.15,8.15,0,0,0-1.1,1.45A12.69,12.69,0,0,0,2.24,7,2.69,2.69,0,0,1,3.46,6.11Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="4.38" cy="8.68" r="2.73" fill="url(#appservices-lin1)"/>
+                <path d="M8.36,13.67A1.77,1.77,0,0,1,8.9,12.4a11.88,11.88,0,0,1-2.53-1.86,2.74,2.74,0,0,1-1.49.83,13.1,13.1,0,0,0,1.45,1.28A12.12,12.12,0,0,0,8.38,13.9,1.79,1.79,0,0,1,8.36,13.67Z" fill="#f2f2f2" opacity="0.55"/>
+                <path d="M14.66,13.88a12,12,0,0,1-2.76-.32.41.41,0,0,1,0,.11,1.75,1.75,0,0,1-.51,1.24,13.69,13.69,0,0,0,3.42.24A8.21,8.21,0,0,0,16,13.81,11.5,11.5,0,0,1,14.66,13.88Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="10.13" cy="13.67" r="1.78" fill="url(#appservices-lin2)"/>
+                <path d="M12.32,8.93a1.83,1.83,0,0,1,.61-1A25.5,25.5,0,0,1,8.47,3.79a16.91,16.91,0,0,1-2-2.92,7.64,7.64,0,0,0-1.09.42A18.14,18.14,0,0,0,7.53,4.47,26.44,26.44,0,0,0,12.32,8.93Z" fill="#f2f2f2" opacity="0.7"/>
+                <circle cx="14.18" cy="9.27" r="1.89" fill="url(#appservices-lin3)"/>
+                <path d="M17.35,10.54,17,10.37l0,0-.3-.16-.06,0L16.38,10l-.07,0L16,9.8a1.76,1.76,0,0,1-.64.92c.12.08.25.15.38.22l.08.05.35.19,0,0,.86.45h0a8.63,8.63,0,0,0,.29-1.11Z" fill="#f2f2f2" opacity="0.55"/>
+            </svg>
+            <h1>Performance Problem Simulator - .NET 10 on Windows</h1>
+        </div>
+        <div id="skuDisplay" class="sku-display">SKU: Loading...</div>
+        <div class="header-right">
+            <button class="btn-panel-toggle" id="btnTogglePanel" title="Toggle Simulation Controls">
+                🎮 Simulation Controls
+            </button>
+            <div class="connection-status">
+                <span id="connectionIndicator" class="indicator disconnected"></span>
+                <span id="connectionText">Disconnected</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar Drawer Navigation -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    <aside id="sidebar-drawer" class="sidebar-drawer">
+        <div class="sidebar-header">
+            <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
+                <defs>
+                    <radialGradient id="appservices-radial-sb" cx="13428.81" cy="3518.86" r="56.67" gradientTransform="translate(-2005.33 -518.83) scale(0.15)" gradientUnits="userSpaceOnUse">
+                        <stop offset="0.18" stop-color="#5ea0ef"/>
+                        <stop offset="1" stop-color="#0078d4"/>
+                    </radialGradient>
+                    <linearGradient id="appservices-lin1-sb" x1="4.4" y1="11.48" x2="4.37" y2="7.53" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin2-sb" x1="10.13" y1="15.45" x2="10.13" y2="11.9" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin3-sb" x1="14.18" y1="11.15" x2="14.18" y2="7.38" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                </defs>
+                <path d="M14.21,15.72A8.5,8.5,0,0,1,3.79,2.28l.09-.06a8.5,8.5,0,0,1,10.33,13.5" fill="url(#appservices-radial-sb)"/>
+                <path d="M6.69,7.23A13,13,0,0,1,15.6,3.65a8.47,8.47,0,0,0-1.49-1.44,14.34,14.34,0,0,0-4.69,1.1A12.54,12.54,0,0,0,5.34,6.13,2.76,2.76,0,0,1,6.69,7.23Z" fill="#fff" opacity="0.6"/>
+                <path d="M2.48,10.65a17.86,17.86,0,0,0-.83,2.62,7.82,7.82,0,0,0,.62.92c.18.23.35.44.55.65A17.94,17.94,0,0,1,3.9,11.37,2.76,2.76,0,0,1,2.48,10.65Z" fill="#fff" opacity="0.6"/>
+                <path d="M3.46,6.11a12,12,0,0,1-.69-2.94,8.15,8.15,0,0,0-1.1,1.45A12.69,12.69,0,0,0,2.24,7,2.69,2.69,0,0,1,3.46,6.11Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="4.38" cy="8.68" r="2.73" fill="url(#appservices-lin1-sb)"/>
+                <path d="M8.36,13.67A1.77,1.77,0,0,1,8.9,12.4a11.88,11.88,0,0,1-2.53-1.86,2.74,2.74,0,0,1-1.49.83,13.1,13.1,0,0,0,1.45,1.28A12.12,12.12,0,0,0,8.38,13.9,1.79,1.79,0,0,1,8.36,13.67Z" fill="#f2f2f2" opacity="0.55"/>
+                <path d="M14.66,13.88a12,12,0,0,1-2.76-.32.41.41,0,0,1,0,.11,1.75,1.75,0,0,1-.51,1.24,13.69,13.69,0,0,0,3.42.24A8.21,8.21,0,0,0,16,13.81,11.5,11.5,0,0,1,14.66,13.88Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="10.13" cy="13.67" r="1.78" fill="url(#appservices-lin2-sb)"/>
+                <path d="M12.32,8.93a1.83,1.83,0,0,1,.61-1A25.5,25.5,0,0,1,8.47,3.79a16.91,16.91,0,0,1-2-2.92,7.64,7.64,0,0,0-1.09.42A18.14,18.14,0,0,0,7.53,4.47,26.44,26.44,0,0,0,12.32,8.93Z" fill="#f2f2f2" opacity="0.7"/>
+                <circle cx="14.18" cy="9.27" r="1.89" fill="url(#appservices-lin3-sb)"/>
+                <path d="M17.35,10.54,17,10.37l0,0-.3-.16-.06,0L16.38,10l-.07,0L16,9.8a1.76,1.76,0,0,1-.64.92c.12.08.25.15.38.22l.08.05.35.19,0,0,.86.45h0a8.63,8.63,0,0,0,.29-1.11Z" fill="#f2f2f2" opacity="0.55"/>
+            </svg>
+            <h2>PerfSim .NET</h2>
+            <button id="sidebar-close" class="sidebar-close" aria-label="Close navigation">&times;</button>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Application</div>
+            <a href="/" class="sidebar-nav-item active">
+                <span class="nav-icon">🎮</span>
+                <span class="nav-label">Dashboard<span class="nav-desc">Live metrics & controls</span></span>
+            </a>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-label">Documentation</div>
+            <a href="/documentation.html" class="sidebar-nav-item">
+                <span class="nav-icon">📚</span>
+                <span class="nav-label">Documentation<span class="nav-desc">API reference & guides</span></span>
+            </a>
+            <a href="/azure-monitoring-guide.html" class="sidebar-nav-item">
+                <span class="nav-icon">☁️</span>
+                <span class="nav-label">Azure Diagnostics<span class="nav-desc">Diagnose issues in App Service</span></span>
+            </a>
+            <a href="/azure-deployment.html" class="sidebar-nav-item">
+                <span class="nav-icon">🚀</span>
+                <span class="nav-label">Deploy to Azure<span class="nav-desc">GitHub Actions + OIDC setup</span></span>
+            </a>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-label">External</div>
+            <a href="https://github.com/rhamlett/perfsimasp48" target="_blank" rel="noopener" class="sidebar-nav-item">
+                <span class="nav-icon">🐙</span>
+                <span class="nav-label">GitHub Repository<span class="nav-desc">Source code & issues</span></span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            Build: <span id="sidebarBuildTime">--</span>
+        </div>
+    </aside>
+
+    <!-- Side Panel for Simulation Controls -->
+    <aside class="side-panel" id="sidePanel">
+        <div class="side-panel-header">
+            <h2>🎮 Simulation Controls</h2>
+            <button class="btn-close-panel" id="btnClosePanel" title="Close Panel">✕</button>
+        </div>
+        <div class="side-panel-content">
+            <div class="control-group cpu-group">
+                <h3>🔥 CPU Stress <span class="control-tooltip" data-tooltip="Spawns worker threads running intensive cryptographic operations to stress CPU cores">ⓘ</span></h3>
+                <p>Spawns worker threads running intensive cryptographic operations to stress CPU cores. Higher intensity uses more parallel threads.</p>
+                <div class="control-inputs">
+                    <label>Duration (s):
+                        <input type="number" id="cpuDuration" value="30" min="1" title="Duration in seconds (minimum 1 second)">
+                    </label>
+                    <label>Intensity:
+                        <select id="cpuLevel" class="wide-input">
+                            <option value="moderate">Moderate</option>
+                            <option value="high" selected>High</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-trigger btn-cpu" id="btnTriggerCpu">🔥 Trigger CPU Stress</button>
+                    <button class="btn btn-stop" id="btnStopCpu">⬛ Stop</button>
+                </div>
+            </div>
+
+            <div class="control-group memory-group">
+                <h3>📊 Memory Pressure <span class="control-tooltip" data-tooltip="Allocates pinned memory blocks filled with random data to increase working set">ⓘ</span></h3>
+                <p>Allocates pinned memory blocks filled with random data. Multiple allocations stack - mimics gradual memory leak.</p>
+                <div class="control-inputs">
+                    <label>Size (MB):
+                        <input type="number" id="memorySize" value="512" min="1" title="Memory size in megabytes (minimum 1 MB). Allocations are cumulative until released.">
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-trigger btn-memory" id="btnAllocateMemory">📈 Allocate</button>
+                    <button class="btn btn-trigger btn-release" id="btnReleaseMemory">🗑️ Release</button>
+                </div>
+            </div>
+
+            <div class="control-group thread-group">
+                <h3>🧵 Thread Pool Starvation <span class="control-tooltip" data-tooltip="Blocks worker threads to simulate thread pool exhaustion">ⓘ</span></h3>
+                <p>Blocks worker threads using sync-over-async anti-pattern to simulate thread pool exhaustion. Server becomes unresponsive to new requests.</p>
+                <p class="info-note">⏱️ <strong>Duration Note:</strong> .NET thread pool starts with ~CPU cores (e.g., 4-8) and grows at only 1-2 threads/second when starved. Impact is visible almost immediately since the initial pool is small.</p>
+                <div class="control-inputs">
+                    <label>Delay (s):
+                        <input type="number" id="threadDelay" value="10" min="0.1" step="0.1" title="How long each blocking operation delays in seconds (minimum 0.1s)">
+                    </label>
+                    <label>Count:
+                        <input type="number" id="threadConcurrent" value="100" min="1" title="Number of concurrent blocking operations (minimum 1)">
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-trigger btn-threadblock" id="btnTriggerThreadBlock">🧵 Block Threads</button>
+                    <button class="btn btn-stop" id="btnStopThreadBlock">⬛ Stop</button>
+                </div>
+            </div>
+
+            <div class="control-group slowrequest-group">
+                <h3>🐌 Slow Requests <span class="control-tooltip" data-tooltip="Generates slow requests ideal for CLR Profiler diagnosis">ⓘ</span></h3>
+                <p>Generates requests using sync-over-async patterns that intentionally take a long time. Ideal for CLR Profiler diagnosis in Azure.</p>
+                <p class="timeout-warning">⚠️ Note: Requests exceeding 30 seconds total time (queue + execution) are flagged as critical</p>
+                <div class="control-inputs">
+                    <label>Request Execution Time (s) <span class="help-icon" title="This value controls only the processing time. Total Duration = Queue Time + Execution Time.">ⓘ</span>:
+                        <input type="number" id="slowRequestDuration" value="25" min="5" max="60">
+                    </label>
+                    <label>Interval (s):
+                        <input type="number" id="slowRequestInterval" value="2" min="1" max="30" title="Time between requests">
+                    </label>
+                    <label>Max Requests:
+                        <input type="number" id="slowRequestMax" value="10" min="1" max="100" title="Total requests to generate">
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-trigger btn-slowrequest" id="btnStartSlowRequests">🐌 Start Slow Requests</button>
+                    <button class="btn btn-stop" id="btnStopSlowRequests">⬛ Stop</button>
+                </div>
+            </div>
+
+            <div class="control-group failedrequest-group">
+                <h3>❌ Failed Requests <span class="control-tooltip" data-tooltip="Generates HTTP 500 errors visible in AppLens and Application Insights">ⓘ</span></h3>
+                <p>Generates HTTP 5xx errors by calling the load test endpoint with 100% failure rate. Creates authentic server errors for testing error monitoring.</p>
+                <p class="info-note">📊 <strong>Where to see:</strong> Azure Portal → AppLens, Application Insights → Failures blade</p>
+                <div class="control-inputs">
+                    <label>Error Count:
+                        <input type="number" id="failedRequestCount" value="10" min="1" max="100" title="Number of HTTP 500 errors to generate">
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-trigger btn-failedrequest" id="btnStartFailedRequests">❌ Generate Failures</button>
+                </div>
+            </div>
+
+            <div class="control-group crash-group">
+                <h3>💥 Application Crash <span class="control-tooltip" data-tooltip="Triggers various types of fatal crashes for testing crash monitoring">ⓘ</span></h3>
+                <p>Triggers a fatal crash to test Azure crash monitoring and diagnostics. Choose from various crash types including stack overflow and access violations.</p>
+                <div class="control-inputs">
+                    <label>Type:
+                        <select id="crashType" class="wide-input">
+                            <option value="FailFast">FailFast</option>
+                            <option value="AccessViolation">Access Violation</option>
+                            <option value="StackOverflow">Stack Overflow</option>
+                            <option value="UnhandledException">Unhandled Exception</option>
+                            <option value="OutOfMemory">Out of Memory</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-trigger btn-danger" id="btnTriggerCrash">💥 Trigger Crash</button>
+                </div>
+                <p class="crash-warning">⚠️ This will TERMINATE the app!</p>
+            </div>
+        </div>
+    </aside>
+
+    <main class="dashboard">
+        <!-- Metrics Cards Row -->
+        <section class="metrics-cards">
+            <div class="metric-card cpu">
+                <div class="metric-header">
+                    <div class="metric-icon">⚡</div>
+                    <div class="metric-label">CPU Usage <span class="metric-tooltip" data-tooltip="System CPU usage percentage across all cores">ⓘ</span></div>
+                </div>
+                <div class="metric-info">
+                    <div class="metric-value" id="cpuValue">--</div>
+                    <div class="metric-unit">%</div>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-bar-fill" id="cpuBar"></div>
+                </div>
+            </div>
+
+            <div class="metric-card memory">
+                <div class="metric-header">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-label">Memory Working Set <span class="metric-tooltip" data-tooltip="Physical memory currently used by the process">ⓘ</span></div>
+                </div>
+                <div class="metric-info">
+                    <div class="metric-value" id="memoryValue">--</div>
+                    <div class="metric-unit">MB</div>
+                    <div class="metric-total" id="memoryTotal"></div>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-bar-fill" id="memoryBar"></div>
+                </div>
+            </div>
+
+            <div class="metric-card threads">
+                <div class="metric-header">
+                    <div class="metric-icon">🧵</div>
+                    <div class="metric-label">Thread Pool <span class="metric-tooltip" data-tooltip="Active worker threads in the .NET thread pool">ⓘ</span></div>
+                </div>
+                <div class="metric-info">
+                    <div class="metric-value" id="threadsValue">--</div>
+                    <div class="metric-unit">threads</div>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-bar-fill" id="threadsBar"></div>
+                </div>
+            </div>
+
+            <div class="metric-card queue">
+                <div class="metric-header">
+                    <div class="metric-icon">📋</div>
+                    <div class="metric-label">Queue Length <span class="metric-tooltip" data-tooltip="Pending work items waiting for thread pool execution">ⓘ</span></div>
+                </div>
+                <div class="metric-info">
+                    <div class="metric-value" id="queueValue">--</div>
+                    <div class="metric-unit">pending</div>
+                </div>
+                <div class="metric-bar">
+                    <div class="metric-bar-fill" id="queueBar"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section class="charts-section">
+            <div class="chart-container">
+                <h3>📈 CPU & Memory Over Time</h3>
+                <canvas id="resourceChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>🧵 Thread Pool Activity</h3>
+                <canvas id="threadChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Latency Monitor Section -->
+        <section class="latency-section">
+            <h2>⏱️ Request Latency Monitor <span id="probe-visualization" class="probe-visualization-inline" title="Probe history: Green=good, Yellow=degraded, Orange=slow, Red=critical"></span></h2>
+            <p class="info-text">Measures response time to a lightweight probe endpoint. Times include both processing and queue time. During thread pool starvation, latency increases dramatically.</p>
+            
+            <div class="latency-stats">
+                <div class="latency-stat current">
+                    <span class="latency-label">Current</span>
+                    <span class="latency-value" id="latencyCurrent">--</span>
+                </div>
+                <div class="latency-stat">
+                    <span class="latency-label">Avg (60s)</span>
+                    <span class="latency-value" id="latencyAverage">--</span>
+                </div>
+                <div class="latency-stat">
+                    <span class="latency-label">Max (60s)</span>
+                    <span class="latency-value" id="latencyMax">--</span>
+                </div>
+                <div class="latency-stat">
+                    <span class="latency-label">Critical (&gt;30s)</span>
+                    <span class="latency-value" id="latencyTimeouts">0</span>
+                </div>
+            </div>
+
+            <div class="latency-thresholds">
+                <span class="threshold-title">Thresholds:</span>
+                <span class="threshold-item good">● Good (&lt;150ms)</span>
+                <span class="threshold-item warning">● Degraded (150ms-1s)</span>
+                <span class="threshold-item danger">● Severe (&gt;1s)</span>
+                <span class="threshold-item timeout">● Critical (&gt;30s)</span>
+            </div>
+
+            <div class="chart-container latency-chart-container position-relative">
+                <h3>📊 Response Latency Over Time</h3>
+                <div id="latencySuspendedMsg" class="latency-suspended-msg">
+                    Latency probes reduced during Slow Request testing to ensure clean CLR Profile diagnostics.
+                </div>
+                <canvas id="latencyChart"></canvas>
+                <div id="latencyOverlay" class="chart-overlay">
+                    <div id="slowRequestStatus" class="slowrequest-status-overlay"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Simulations -->
+        <section class="active-simulations">
+            <h2>🏃 Active Simulations</h2>
+            <div id="simulationsList" class="simulations-list">
+                <p class="no-simulations">No active simulations</p>
+            </div>
+        </section>
+
+        <!-- Event Log -->
+        <section class="event-log">
+            <div class="event-log-header">
+                <h2>📜 Event Log</h2>
+                <button id="btnCopyEventLog" class="btn-copy-log" title="Copy event log to clipboard">📋 Copy</button>
+            </div>
+            <div id="eventLog" class="log-container"></div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Performance Problem Simulator — Educational Tool for Azure App Service Diagnostics</p>
+        <p id="pageFooterContent"></p>
+        <p>Build: <span id="buildTime">--</span></p>
+    </footer>
+
+    <script src="js/dashboard.js?v=3"></script>
+    <script>
+        // Sidebar drawer toggle
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const sidebarDrawer = document.getElementById('sidebar-drawer');
+        const sidebarClose = document.getElementById('sidebar-close');
+
+        function openSidebar() {
+            hamburgerBtn.classList.remove('attention');
+            hamburgerBtn.classList.add('active');
+            sidebarOverlay.classList.add('active');
+            sidebarDrawer.classList.add('active');
+        }
+
+        function closeSidebar() {
+            hamburgerBtn.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            sidebarDrawer.classList.remove('active');
+        }
+
+        hamburgerBtn.addEventListener('click', openSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+        sidebarClose.addEventListener('click', closeSidebar);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeSidebar();
+        });
+    </script>
+</body>
+</html>

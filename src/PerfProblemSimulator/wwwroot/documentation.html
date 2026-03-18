@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Problem Simulator - Documentation</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="css/dashboard.css?v=6">
+</head>
+<body class="page-secondary">
+    <style>
+        /* Documentation-specific styles */
+        .doc-layout {
+            display: flex;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .doc-main {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .doc-container {
+            max-width: 900px;
+        }
+
+        .doc-toc {
+            width: 280px;
+            flex-shrink: 0;
+        }
+
+        .doc-toc-sticky {
+            position: sticky;
+            top: 80px;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .doc-toc-card {
+            background: var(--color-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 1.25rem;
+        }
+
+        .doc-toc-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-muted);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--color-bg);
+        }
+
+        .doc-toc ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .doc-toc-item {
+            margin-bottom: 0.25rem;
+        }
+
+        .doc-toc-item a {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            color: var(--color-text-muted);
+            font-size: 0.875rem;
+            transition: all var(--transition-fast);
+            border-left: 2px solid transparent;
+        }
+
+        .doc-toc-item a:hover {
+            background: rgba(0, 120, 212, 0.08);
+            color: var(--color-primary);
+            border-left-color: var(--color-primary);
+        }
+
+        .doc-toc-item a.active {
+            background: rgba(0, 120, 212, 0.12);
+            color: var(--color-primary);
+            font-weight: 500;
+            border-left-color: var(--color-primary);
+        }
+
+        .toc-icon {
+            font-size: 1rem;
+            width: 1.25rem;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .doc-toc-divider {
+            height: 1px;
+            background: var(--color-bg);
+            margin: 0.75rem 0;
+        }
+
+        .doc-toc-section-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-text-muted);
+            padding: 0.5rem 0.75rem 0.25rem;
+            opacity: 0.7;
+        }
+
+        .deploy-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .deploy-header h1 {
+            color: var(--color-primary);
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+
+        .deploy-header p {
+            color: var(--color-text-muted);
+            font-size: 1.1rem;
+        }
+
+        .doc-section {
+            background: var(--color-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            scroll-margin-top: 80px;
+        }
+
+        .doc-section h2 {
+            color: var(--color-primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--color-bg);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .doc-section h3 {
+            color: var(--color-text);
+            margin: 1.5rem 0 1rem;
+        }
+
+        .doc-section p {
+            margin-bottom: 1rem;
+            color: var(--color-text-muted);
+        }
+
+        .doc-section ul, .doc-section ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .doc-section li {
+            margin-bottom: 0.5rem;
+            color: var(--color-text-muted);
+        }
+
+        .doc-section code {
+            background: #f6f8fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: var(--radius-sm);
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.875em;
+            color: var(--color-danger);
+        }
+
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            white-space: pre;
+        }
+
+        .code-block .comment { color: #6a9955; }
+        .code-block .string { color: #ce9178; }
+        .code-block .keyword { color: #569cd6; }
+        .code-block .command { color: #dcdcaa; }
+
+        .warning-box {
+            background: linear-gradient(135deg, rgba(255, 185, 0, 0.15) 0%, rgba(209, 52, 56, 0.1) 100%);
+            border-left: 4px solid var(--color-warning);
+            padding: 1rem 1.5rem;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box h4 {
+            color: var(--color-danger);
+            margin-bottom: 0.5rem;
+        }
+
+        .warning-box ul {
+            margin-left: 1.5rem;
+        }
+
+        .warning-box li {
+            color: var(--color-text);
+        }
+
+        .api-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .api-table th, .api-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--color-bg);
+        }
+
+        .api-table th {
+            background: var(--color-bg);
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        .api-table tr:hover td {
+            background: rgba(0, 120, 212, 0.05);
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .method-get {
+            background: rgba(16, 124, 16, 0.15);
+            color: var(--color-success);
+        }
+
+        .method-post {
+            background: rgba(0, 120, 212, 0.15);
+            color: var(--color-primary);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .feature-item {
+            background: var(--color-bg);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .feature-icon {
+            font-size: 1.5rem;
+        }
+
+        .feature-text strong {
+            display: block;
+            color: var(--color-text);
+            margin-bottom: 0.25rem;
+        }
+
+        .feature-text span {
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+        }
+
+        .architecture-tree {
+            background: var(--color-bg);
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.8;
+        }
+
+        .architecture-tree .folder { color: var(--color-primary); font-weight: 600; }
+        .architecture-tree .file { color: var(--color-text-muted); }
+        .architecture-tree .comment { color: var(--color-success); font-style: italic; opacity: 0.8; margin-left: 1rem; }
+
+
+
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .config-table th, .config-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--color-bg);
+        }
+
+        .config-table th {
+            background: var(--color-bg);
+            font-weight: 600;
+        }
+
+        @media (max-width: 1024px) {
+            .doc-layout {
+                flex-direction: column;
+            }
+
+            .doc-toc {
+                width: 100%;
+                order: -1;
+            }
+
+            .doc-toc-sticky {
+                position: relative;
+                top: 0;
+                max-height: none;
+            }
+
+            .doc-toc ul {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .doc-toc-item {
+                margin-bottom: 0;
+            }
+
+            .doc-toc-item a {
+                padding: 0.375rem 0.625rem;
+                border-left: none;
+                border-radius: var(--radius-md);
+                background: var(--color-bg);
+            }
+
+            .doc-toc-divider,
+            .doc-toc-section-label {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .doc-layout {
+                padding: 1rem;
+            }
+
+            .api-table {
+                font-size: 0.875rem;
+            }
+
+            .api-table th, .api-table td {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <button id="hamburger-btn" class="hamburger-btn attention" aria-label="Open navigation menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
+                <defs>
+                    <radialGradient id="appservices-radial" cx="13428.81" cy="3518.86" r="56.67" gradientTransform="translate(-2005.33 -518.83) scale(0.15)" gradientUnits="userSpaceOnUse">
+                        <stop offset="0.18" stop-color="#5ea0ef"/>
+                        <stop offset="1" stop-color="#0078d4"/>
+                    </radialGradient>
+                    <linearGradient id="appservices-lin1" x1="4.4" y1="11.48" x2="4.37" y2="7.53" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin2" x1="10.13" y1="15.45" x2="10.13" y2="11.9" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin3" x1="14.18" y1="11.15" x2="14.18" y2="7.38" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                </defs>
+                <path d="M14.21,15.72A8.5,8.5,0,0,1,3.79,2.28l.09-.06a8.5,8.5,0,0,1,10.33,13.5" fill="url(#appservices-radial)"/>
+                <path d="M6.69,7.23A13,13,0,0,1,15.6,3.65a8.47,8.47,0,0,0-1.49-1.44,14.34,14.34,0,0,0-4.69,1.1A12.54,12.54,0,0,0,5.34,6.13,2.76,2.76,0,0,1,6.69,7.23Z" fill="#fff" opacity="0.6"/>
+                <path d="M2.48,10.65a17.86,17.86,0,0,0-.83,2.62,7.82,7.82,0,0,0,.62.92c.18.23.35.44.55.65A17.94,17.94,0,0,1,3.9,11.37,2.76,2.76,0,0,1,2.48,10.65Z" fill="#fff" opacity="0.6"/>
+                <path d="M3.46,6.11a12,12,0,0,1-.69-2.94,8.15,8.15,0,0,0-1.1,1.45A12.69,12.69,0,0,0,2.24,7,2.69,2.69,0,0,1,3.46,6.11Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="4.38" cy="8.68" r="2.73" fill="url(#appservices-lin1)"/>
+                <path d="M8.36,13.67A1.77,1.77,0,0,1,8.9,12.4a11.88,11.88,0,0,1-2.53-1.86,2.74,2.74,0,0,1-1.49.83,13.1,13.1,0,0,0,1.45,1.28A12.12,12.12,0,0,0,8.38,13.9,1.79,1.79,0,0,1,8.36,13.67Z" fill="#f2f2f2" opacity="0.55"/>
+                <path d="M14.66,13.88a12,12,0,0,1-2.76-.32.41.41,0,0,1,0,.11,1.75,1.75,0,0,1-.51,1.24,13.69,13.69,0,0,0,3.42.24A8.21,8.21,0,0,0,16,13.81,11.5,11.5,0,0,1,14.66,13.88Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="10.13" cy="13.67" r="1.78" fill="url(#appservices-lin2)"/>
+                <path d="M12.32,8.93a1.83,1.83,0,0,1,.61-1A25.5,25.5,0,0,1,8.47,3.79a16.91,16.91,0,0,1-2-2.92,7.64,7.64,0,0,0-1.09.42A18.14,18.14,0,0,0,7.53,4.47,26.44,26.44,0,0,0,12.32,8.93Z" fill="#f2f2f2" opacity="0.7"/>
+                <circle cx="14.18" cy="9.27" r="1.89" fill="url(#appservices-lin3)"/>
+                <path d="M17.35,10.54,17,10.37l0,0-.3-.16-.06,0L16.38,10l-.07,0L16,9.8a1.76,1.76,0,0,1-.64.92c.12.08.25.15.38.22l.08.05.35.19,0,0,.86.45h0a8.63,8.63,0,0,0,.29-1.11Z" fill="#f2f2f2" opacity="0.55"/>
+            </svg>
+            <h1>Performance Problem Simulator - .NET 10 on Windows</h1>
+        </div>
+        <div id="skuDisplay" class="sku-display">SKU: Loading...</div>
+        <div class="header-right">
+            <a href="/" class="btn-panel-toggle">🏠 Dashboard</a>
+        </div>
+    </header>
+
+    <!-- Sidebar Drawer Navigation -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    <aside id="sidebar-drawer" class="sidebar-drawer">
+        <div class="sidebar-header">
+            <svg class="app-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
+                <defs>
+                    <radialGradient id="appservices-radial-sb" cx="13428.81" cy="3518.86" r="56.67" gradientTransform="translate(-2005.33 -518.83) scale(0.15)" gradientUnits="userSpaceOnUse">
+                        <stop offset="0.18" stop-color="#5ea0ef"/>
+                        <stop offset="1" stop-color="#0078d4"/>
+                    </radialGradient>
+                    <linearGradient id="appservices-lin1-sb" x1="4.4" y1="11.48" x2="4.37" y2="7.53" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin2-sb" x1="10.13" y1="15.45" x2="10.13" y2="11.9" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                    <linearGradient id="appservices-lin3-sb" x1="14.18" y1="11.15" x2="14.18" y2="7.38" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ccc"/>
+                        <stop offset="1" stop-color="#fcfcfc"/>
+                    </linearGradient>
+                </defs>
+                <path d="M14.21,15.72A8.5,8.5,0,0,1,3.79,2.28l.09-.06a8.5,8.5,0,0,1,10.33,13.5" fill="url(#appservices-radial-sb)"/>
+                <path d="M6.69,7.23A13,13,0,0,1,15.6,3.65a8.47,8.47,0,0,0-1.49-1.44,14.34,14.34,0,0,0-4.69,1.1A12.54,12.54,0,0,0,5.34,6.13,2.76,2.76,0,0,1,6.69,7.23Z" fill="#fff" opacity="0.6"/>
+                <path d="M2.48,10.65a17.86,17.86,0,0,0-.83,2.62,7.82,7.82,0,0,0,.62.92c.18.23.35.44.55.65A17.94,17.94,0,0,1,3.9,11.37,2.76,2.76,0,0,1,2.48,10.65Z" fill="#fff" opacity="0.6"/>
+                <path d="M3.46,6.11a12,12,0,0,1-.69-2.94,8.15,8.15,0,0,0-1.1,1.45A12.69,12.69,0,0,0,2.24,7,2.69,2.69,0,0,1,3.46,6.11Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="4.38" cy="8.68" r="2.73" fill="url(#appservices-lin1-sb)"/>
+                <path d="M8.36,13.67A1.77,1.77,0,0,1,8.9,12.4a11.88,11.88,0,0,1-2.53-1.86,2.74,2.74,0,0,1-1.49.83,13.1,13.1,0,0,0,1.45,1.28A12.12,12.12,0,0,0,8.38,13.9,1.79,1.79,0,0,1,8.36,13.67Z" fill="#f2f2f2" opacity="0.55"/>
+                <path d="M14.66,13.88a12,12,0,0,1-2.76-.32.41.41,0,0,1,0,.11,1.75,1.75,0,0,1-.51,1.24,13.69,13.69,0,0,0,3.42.24A8.21,8.21,0,0,0,16,13.81,11.5,11.5,0,0,1,14.66,13.88Z" fill="#f2f2f2" opacity="0.55"/>
+                <circle cx="10.13" cy="13.67" r="1.78" fill="url(#appservices-lin2-sb)"/>
+                <path d="M12.32,8.93a1.83,1.83,0,0,1,.61-1A25.5,25.5,0,0,1,8.47,3.79a16.91,16.91,0,0,1-2-2.92,7.64,7.64,0,0,0-1.09.42A18.14,18.14,0,0,0,7.53,4.47,26.44,26.44,0,0,0,12.32,8.93Z" fill="#f2f2f2" opacity="0.7"/>
+                <circle cx="14.18" cy="9.27" r="1.89" fill="url(#appservices-lin3-sb)"/>
+                <path d="M17.35,10.54,17,10.37l0,0-.3-.16-.06,0L16.38,10l-.07,0L16,9.8a1.76,1.76,0,0,1-.64.92c.12.08.25.15.38.22l.08.05.35.19,0,0,.86.45h0a8.63,8.63,0,0,0,.29-1.11Z" fill="#f2f2f2" opacity="0.55"/>
+            </svg>
+            <h2>PerfSim .NET</h2>
+            <button id="sidebar-close" class="sidebar-close" aria-label="Close navigation">&times;</button>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Application</div>
+            <a href="/" class="sidebar-nav-item">
+                <span class="nav-icon">🎮</span>
+                <span class="nav-label">Dashboard<span class="nav-desc">Live metrics & controls</span></span>
+            </a>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-label">Documentation</div>
+            <a href="/documentation.html" class="sidebar-nav-item active">
+                <span class="nav-icon">📚</span>
+                <span class="nav-label">Documentation<span class="nav-desc">API reference & guides</span></span>
+            </a>
+            <a href="/azure-monitoring-guide.html" class="sidebar-nav-item">
+                <span class="nav-icon">☁️</span>
+                <span class="nav-label">Azure Diagnostics<span class="nav-desc">Diagnose issues in App Service</span></span>
+            </a>
+            <a href="/azure-deployment.html" class="sidebar-nav-item">
+                <span class="nav-icon">🚀</span>
+                <span class="nav-label">Deploy to Azure<span class="nav-desc">GitHub Actions + OIDC setup</span></span>
+            </a>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section-label">External</div>
+            <a href="https://github.com/rhamlett/perfsimasp48" target="_blank" rel="noopener" class="sidebar-nav-item">
+                <span class="nav-icon">🐙</span>
+                <span class="nav-label">GitHub Repository<span class="nav-desc">Source code & issues</span></span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            Build: <span id="sidebarBuildTime">--</span>
+        </div>
+    </aside>
+
+    <div class="doc-layout">
+        <div class="doc-main">
+        <div class="doc-container">
+        <div class="deploy-header">
+            <h1>📚 Documentation</h1>
+            <p>API reference, guides, and usage examples for the Performance Problem Simulator</p>
+        </div>
+
+        <!-- Overview Section -->
+        <section id="overview" class="doc-section">
+            <h2>🎯 Performance Problem Simulator</h2>
+            <p>An educational Azure App Service application that <strong>intentionally creates performance problems</strong> for learning and demonstration purposes.</p>
+            
+            <h3>Purpose</h3>
+            <p>This application is designed to help Azure App Service Support engineers and Technical Advisors:</p>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">📖</div>
+                    <div class="feature-text">
+                        <strong>Learn</strong>
+                        <span>How to diagnose common performance issues in Azure App Service</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔧</div>
+                    <div class="feature-text">
+                        <strong>Practice</strong>
+                        <span>Using Azure diagnostics and monitoring tools</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🎭</div>
+                    <div class="feature-text">
+                        <strong>Demonstrate</strong>
+                        <span>Performance anti-patterns in a controlled environment</span>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">👥</div>
+                    <div class="feature-text">
+                        <strong>Train</strong>
+                        <span>Support teams on identifying and resolving performance problems</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning-box">
+                <h4>⚠️ Warning - This application intentionally creates performance problems!</h4>
+                <ul>
+                    <li>🔥 <strong>CPU stress</strong> - Creates dedicated threads running spin loops to consume all CPU cores</li>
+                    <li>📊 <strong>Memory pressure</strong> - Allocates and pins memory blocks to increase working set</li>
+                    <li>🧵 <strong>Thread pool starvation</strong> - Uses sync-over-async anti-patterns to block thread pool threads</li>
+                    <li>🐌 <strong>Slow requests</strong> - Generates long-running requests with sync-over-async patterns for CLR Profiler analysis</li>
+                    <li>💥 <strong>Application crashes</strong> - Triggers fatal crashes for testing Azure Crash Monitoring and memory dumps</li>
+                    <li>❌ <strong>Failed requests</strong> - Generates HTTP 5xx errors for testing AppLens and Application Insights</li>
+                </ul>
+                <p class="mt-1 mb-0"><strong>Only deploy this application in isolated, non-production environments.</strong></p>
+            </div>
+        </section>
+
+        <!-- Quick Start Section -->
+        <section id="quick-start" class="doc-section">
+            <h2>🚀 Quick Start</h2>
+            
+            <h3>Run Locally</h3>
+            <div class="code-block">
+<span class="comment"># Clone the repository</span>
+git clone https://github.com/rhamlett/perfsimasp48.git
+cd perfsimasp48
+
+<span class="comment"># Restore and build</span>
+dotnet build
+
+<span class="comment"># Run the application</span>
+dotnet run --project src/PerfProblemSimulator
+
+<span class="comment"># Open in browser</span>
+<span class="comment"># Dashboard: http://localhost:5000</span>
+<span class="comment"># Swagger: http://localhost:5000/swagger</span>
+            </div>
+
+            <h3>Run Tests</h3>
+            <div class="code-block">
+<span class="comment"># Run all tests</span>
+dotnet test
+
+<span class="comment"># Run with coverage</span>
+dotnet test --collect:<span class="string">"XPlat Code Coverage"</span>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="doc-section">
+            <h2>📊 Dashboard</h2>
+            <p>The application includes a real-time dashboard at the root URL that shows:</p>
+            <ul>
+                <li><strong>CPU usage</strong> - Current processor utilization</li>
+                <li><strong>Memory</strong> - Working set and GC heap sizes</li>
+                <li><strong>Thread pool</strong> - Active threads and queue length</li>
+                <li><strong>Request latency</strong> - Real-time probe response time (shows impact of thread pool starvation)</li>
+                <li><strong>Active simulations</strong> - Currently running problem simulations</li>
+            </ul>
+            <p>The dashboard uses SignalR for real-time updates and includes controls to trigger each type of simulation.</p>
+
+            <h3>Metric Color Indicators</h3>
+            <p>The CPU and Memory metric tiles use dynamic color coding to indicate resource utilization levels:</p>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Color</th>
+                        <th>Utilization</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Black (default)</td>
+                        <td>0-60%</td>
+                        <td>Normal - resources are within acceptable range</td>
+                    </tr>
+                    <tr>
+                        <td class="text-warning">Yellow</td>
+                        <td>60-80%</td>
+                        <td>Warning - elevated usage, approaching concerning levels</td>
+                    </tr>
+                    <tr>
+                        <td class="text-danger">Red</td>
+                        <td>&gt;80%</td>
+                        <td>Danger - high usage, potential resource exhaustion</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Note:</strong> Memory thresholds are calculated dynamically based on the actual total available memory reported by the server, not a hardcoded value. This ensures accurate warnings regardless of the machine's RAM configuration.</p>
+
+            <h3>Event Log & Simulation IDs</h3>
+            <p>The Event Log at the bottom of the dashboard records all simulation activity with color-coded entries matching each simulation type. Messages related to a specific simulation instance are marked with a <span class="sim-msg">dotted underline</span>.</p>
+            <p><strong>Viewing Simulation IDs:</strong> Hover over any underlined message to reveal the full <strong>Simulation ID</strong> (GUID) in a tooltip. This ID uniquely identifies each simulation instance.</p>
+            <p><strong>Using Simulation IDs for Troubleshooting:</strong></p>
+            <ul>
+                <li>The same Simulation ID is logged server-side and appears in Azure Application Insights and Log Analytics</li>
+                <li>Use this ID to correlate dashboard events with server logs when analyzing performance issues</li>
+                <li>Filter Azure logs by Simulation ID to isolate telemetry from a specific simulation run</li>
+                <li>See the <a href="azure-monitoring-guide.html#simulation-ids">Azure Monitoring Guide</a> for detailed correlation techniques</li>
+            </ul>
+        </section>
+
+        <!-- Request Latency Monitor Section -->
+        <section id="latency" class="doc-section">
+            <h2>⏱️ Request Latency Monitor</h2>
+            <p>The dashboard includes a <strong>Request Latency Monitor</strong> that demonstrates how thread pool starvation affects real-world request processing. The latency values shown include <strong>both queue time and processing time</strong>.</p>
+            
+            <h3>How It Works</h3>
+            <ul>
+                <li>A dedicated background thread (not from the thread pool) continuously probes <code>/api/health/probe</code></li>
+                <li>Latency is measured end-to-end: request sent → response received</li>
+                <li>Results are broadcast via SignalR to the dashboard in real-time</li>
+            </ul>
+
+            <h3>What You'll Observe</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Scenario</th>
+                        <th>Latency (Total)</th>
+                        <th>Status</th>
+                        <th>Explanation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Normal operation</td>
+                        <td>&lt; 150ms</td>
+                        <td>🟢 Good</td>
+                        <td>Thread pool threads available</td>
+                    </tr>
+                    <tr>
+                        <td>Mild starvation</td>
+                        <td>150ms - 1s</td>
+                        <td>🟡 Degraded</td>
+                        <td>Requests queued waiting for threads</td>
+                    </tr>
+                    <tr>
+                        <td>Severe starvation</td>
+                        <td>&gt; 1s</td>
+                        <td>🔴 Severe</td>
+                        <td>Significant queuing delay</td>
+                    </tr>
+                    <tr>
+                        <td>Timeout</td>
+                        <td>30s</td>
+                        <td>🔴 Critical</td>
+                        <td>No thread became available within timeout</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Why This Matters</h3>
+            <p>During thread pool starvation, CPU and memory metrics often look normal, but users experience severe latency. The latency monitor makes this invisible problem <strong>visible</strong> — you can watch response times spike from milliseconds to seconds when triggering the sync-over-async simulation.</p>
+        </section>
+
+        <!-- CPU Stress Section -->
+        <section id="cpu" class="doc-section">
+            <h2>🔥 CPU Stress Simulation</h2>
+            <p>The CPU Stress simulation creates high CPU usage through parallel spin loops, saturating all available CPU cores for a specified duration.</p>
+
+            <h3>How It Works</h3>
+            <p>The simulation spawns one thread per CPU core, each running a busy-wait spin loop (incrementing a counter in a tight <code>while(true)</code> loop). This consumes 100% of CPU capacity across all cores.</p>
+
+            <h3>Dashboard Controls</h3>
+            <ul>
+                <li><strong>Duration:</strong> How long to run the stress test (10-300 seconds, default 30)</li>
+                <li><strong>Start/Stop:</strong> Begin or cancel the simulation</li>
+            </ul>
+
+            <h3>What You'll Observe</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>During Simulation</th>
+                        <th>Explanation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CPU %</td>
+                        <td>~100%</td>
+                        <td>All cores saturated by spin loops</td>
+                    </tr>
+                    <tr>
+                        <td>Memory</td>
+                        <td>Unchanged</td>
+                        <td>Spin loops don't allocate memory</td>
+                    </tr>
+                    <tr>
+                        <td>Latency</td>
+                        <td>May increase</td>
+                        <td>Less CPU available for request processing</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Real-World CPU Issues</h3>
+            <p>High CPU in production is typically caused by:</p>
+            <ul>
+                <li>Inefficient algorithms (O(n²) when O(n) is possible)</li>
+                <li>Infinite loops due to bugs</li>
+                <li>Excessive regular expression backtracking</li>
+                <li>Unoptimized LINQ queries with large datasets</li>
+                <li>Busy-waiting instead of using async/await</li>
+            </ul>
+
+            <h3>Diagnosis Tools</h3>
+            <ul>
+                <li><code>dotnet-counters monitor -p {PID} --counters System.Runtime</code></li>
+                <li><code>dotnet-trace collect -p {PID}</code> for CPU profiling</li>
+                <li>Azure App Service → Diagnose and Solve Problems → CPU usage</li>
+                <li>Application Insights Performance blade</li>
+            </ul>
+        </section>
+
+        <!-- Memory Pressure Section -->
+        <section id="memory" class="doc-section">
+            <h2>💾 Memory Pressure Simulation</h2>
+            <p>The Memory Pressure simulation allocates and holds large byte arrays to demonstrate memory consumption patterns and garbage collection behavior.</p>
+
+            <h3>How It Works</h3>
+            <p>Large byte arrays (minimum 10MB, default 100MB) are allocated using <code>GC.AllocateArray&lt;byte&gt;(pinned: true)</code>. The pinned allocation prevents the garbage collector from moving the memory, simulating problematic allocation patterns.</p>
+
+            <h3>Dashboard Controls</h3>
+            <ul>
+                <li><strong>Size (MB):</strong> Amount of memory to allocate (10-500MB)</li>
+                <li><strong>Allocate:</strong> Adds a new memory block</li>
+                <li><strong>Release All:</strong> Frees all allocated blocks and triggers GC</li>
+            </ul>
+
+            <h3>What You'll Observe</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>After Allocation</th>
+                        <th>Explanation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Memory (MB)</td>
+                        <td>Increases by allocation size</td>
+                        <td>Charts reflect working set increase</td>
+                    </tr>
+                    <tr>
+                        <td>CPU</td>
+                        <td>Brief spike</td>
+                        <td>Memory allocation and zeroing</td>
+                    </tr>
+                    <tr>
+                        <td>After Release</td>
+                        <td>Memory drops</td>
+                        <td>GC.Collect() reclaims memory</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Large Object Heap (LOH)</h3>
+            <p>Objects larger than 85KB are allocated on the Large Object Heap:</p>
+            <ul>
+                <li>LOH is collected less frequently (Gen 2 collections only)</li>
+                <li>Pinned allocations prevent memory compaction</li>
+                <li>Can lead to memory fragmentation over time</li>
+                <li>Our allocations (10MB+) always go to LOH</li>
+            </ul>
+
+            <h3>Real-World Memory Issues</h3>
+            <ul>
+                <li>Static collections that accumulate data without limits</li>
+                <li>Event handlers not being unsubscribed</li>
+                <li>Improper IDisposable implementation</li>
+                <li>Caching without size limits or expiration</li>
+                <li>Keeping references to large objects longer than needed</li>
+            </ul>
+
+            <h3>Diagnosis Tools</h3>
+            <ul>
+                <li><code>dotnet-dump collect -p {PID}</code> for memory dumps</li>
+                <li><code>dotnet-gcdump collect -p {PID}</code> for GC heap analysis</li>
+                <li>Visual Studio Memory Profiler</li>
+                <li>Azure App Service → Memory Working Set blade</li>
+            </ul>
+        </section>
+
+        <!-- Thread Pool Starvation Section -->
+        <section id="threadpool" class="doc-section">
+            <h2>🧵 Thread Pool Starvation</h2>
+            <p>The Thread Pool Starvation simulation demonstrates the dangerous "sync-over-async" anti-pattern, where synchronous code blocks waiting for asynchronous operations to complete.</p>
+
+            <h3>How It Works</h3>
+            <p>The simulation spawns multiple parallel tasks (default: 2× CPU cores) that each call <code>Task.Delay().Wait()</code>. This blocks thread pool threads, causing:</p>
+            <ol>
+                <li>Thread pool threads become blocked waiting</li>
+                <li>.NET slowly adds new threads (~1 per second)</li>
+                <li>Incoming requests queue up waiting for threads</li>
+                <li>Request latency spikes dramatically</li>
+            </ol>
+
+            <h3>Dashboard Controls</h3>
+            <ul>
+                <li><strong>Duration:</strong> How long each blocking operation lasts (default 15s)</li>
+                <li><strong>Threads:</strong> Number of blocking threads to spawn</li>
+                <li><strong>Start/Stop:</strong> Begin or cancel the simulation</li>
+            </ul>
+
+            <h3>The Sync-Over-Async Anti-Pattern</h3>
+            <p>These patterns block threads and should be avoided:</p>
+            <pre><code>// ❌ BAD - Blocks thread waiting for Task
+var result = SomeAsyncMethod().Result;
+var result = SomeAsyncMethod().GetAwaiter().GetResult();
+SomeAsyncMethod().Wait();
+
+// ✅ GOOD - Properly awaits the Task
+var result = await SomeAsyncMethod();</code></pre>
+
+            <h3>What You'll Observe</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>During Starvation</th>
+                        <th>Explanation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>CPU</td>
+                        <td>LOW</td>
+                        <td>Threads are waiting, not working</td>
+                    </tr>
+                    <tr>
+                        <td>Memory</td>
+                        <td>Normal</td>
+                        <td>No memory leak occurring</td>
+                    </tr>
+                    <tr>
+                        <td>Thread Count</td>
+                        <td>Slowly climbing</td>
+                        <td>.NET adds ~1 thread/second</td>
+                    </tr>
+                    <tr>
+                        <td>Latency</td>
+                        <td>🔴 Spikes to seconds</td>
+                        <td>Requests queued waiting for threads</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Why CPU is Low but Latency is High</h3>
+            <p>This is the signature of thread pool starvation. The CPU isn't working because all threads are blocked waiting. New requests can't start because there are no available threads. It looks like the app is idle, but users experience timeouts.</p>
+
+            <h3>Real-World Causes</h3>
+            <ul>
+                <li>Calling async libraries from sync code: <code>httpClient.GetAsync(url).Result</code></li>
+                <li>Mixing sync and async in constructors</li>
+                <li>Using <code>.Result</code> in properties</li>
+                <li>Calling async methods from Dispose()</li>
+                <li>Third-party libraries that block internally</li>
+            </ul>
+
+            <h3>How to Fix</h3>
+            <ul>
+                <li>Use <code>await</code> all the way up the call stack ("async all the way down")</li>
+                <li>Avoid <code>.Result</code>, <code>.Wait()</code>, and <code>.GetAwaiter().GetResult()</code></li>
+                <li>Use <code>ConfigureAwait(false)</code> in library code</li>
+                <li>Consider <code>IAsyncEnumerable</code> for streaming data</li>
+            </ul>
+
+            <h3>Diagnosis Tools</h3>
+            <ul>
+                <li><code>dotnet-counters</code>: Watch "ThreadPool Thread Count" and "ThreadPool Queue Length"</li>
+                <li>Response times spike for ALL endpoints simultaneously</li>
+                <li>Azure App Service → Diagnose and Solve Problems → Thread count</li>
+            </ul>
+        </section>
+
+        <!-- Slow Request Section -->
+        <section id="slowrequest" class="doc-section">
+            <h2>🐌 Slow Request Simulator</h2>
+            <p>The Slow Request Simulator generates long-running requests (~25 seconds each) using sync-over-async patterns specifically designed for <strong>CLR Profiler training</strong>.</p>
+
+            <h3>Purpose</h3>
+            <p>Unlike the Thread Pool Starvation simulation (which causes many short blocks), this creates individual long requests that are clearly visible in profiler call stacks. The method names are intentionally descriptive to make identifying the blocking patterns easy.</p>
+
+            <h3>Three Sync-Over-Async Scenarios</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Scenario</th>
+                        <th>Method Pattern</th>
+                        <th>What to Look For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Simple</strong></td>
+                        <td><code>_BLOCKING_HERE</code></td>
+                        <td><code>Task.Delay().Wait()</code> causing blocking</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Nested</strong></td>
+                        <td><code>_BLOCKS_INTERNALLY</code></td>
+                        <td>Sync methods that block internally</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database</strong></td>
+                        <td><code>_SYNC_BLOCK</code></td>
+                        <td><code>GetAwaiter().GetResult()</code> pattern</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Recommended Settings</h3>
+            <p>For a 60-second CLR Profiler trace:</p>
+            <ul>
+                <li><strong>Request Execution Time:</strong> 25 seconds (processing time only, excludes queue time)</li>
+                <li><strong>Interval:</strong> 10 seconds (multiple samples)</li>
+                <li><strong>Max Requests:</strong> 6 (doesn't overwhelm)</li>
+            </ul>
+
+            <p><strong>Note on Queue Time:</strong> If the thread pool is starved, you may see a large gap in the trace before the request starts. This is "Queue Time" (waiting for a thread) vs "Execution Time" (running the code).</p>
+
+            <h3>Using with CLR Profiler</h3>
+            <ol>
+                <li>Start a CPU Profiler trace (60-120 seconds)</li>
+                <li>Click <strong>🐌 Start Slow Requests</strong> in the dashboard</li>
+                <li>Wait for trace to complete</li>
+                <li>Download and analyze - look for the descriptive method names</li>
+            </ol>
+
+            <p>See the <a href="/azure-monitoring-guide.html#slowrequest">Azure Diagnostics Guide</a> for detailed profiler analysis instructions.</p>
+        </section>
+
+        <!-- Crash Simulation Section -->
+        <section id="crash" class="doc-section">
+            <h2>💥 Crash Simulation</h2>
+            <p>The dashboard includes a <strong>Crash Simulation</strong> feature for testing Azure crash monitoring and memory dump collection.</p>
+
+            <div class="warning-box">
+                <h4>⚠️ Warning - This will TERMINATE the application!</h4>
+                <p>Crash simulations immediately terminate the process. Azure App Service will automatically restart the application after a crash. Make sure you have Azure Crash Monitoring enabled before triggering a crash.</p>
+            </div>
+
+            <h3>Available Crash Types</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>FailFast</strong></td>
+                        <td>Calls <code>Environment.FailFast()</code> which immediately terminates with a Windows Error Report</td>
+                        <td>General crash testing (recommended)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>StackOverflow</strong></td>
+                        <td>Infinite recursion causing stack overflow - cannot be caught</td>
+                        <td>Stack trace analysis practice</td>
+                    </tr>
+                    <tr>
+                        <td><strong>UnhandledException</strong></td>
+                        <td>Throws unhandled exception on background thread</td>
+                        <td>Exception handling education</td>
+                    </tr>
+                    <tr>
+                        <td><strong>AccessViolation</strong></td>
+                        <td>Writes to invalid memory (null pointer)</td>
+                        <td>Native/unsafe code debugging</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OutOfMemory</strong></td>
+                        <td>Allocates memory until the process crashes</td>
+                        <td>Memory dump analysis</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Azure Crash Monitoring Setup</h3>
+            <ol>
+                <li>In Azure Portal, go to your App Service</li>
+                <li>Navigate to <strong>Diagnose and solve problems</strong></li>
+                <li>Search for <strong>"Crash Monitoring"</strong></li>
+                <li>Enable crash monitoring with <strong>"Collect Memory Dump"</strong></li>
+                <li>Trigger a crash using the dashboard or API</li>
+                <li>Download the crash dump from the Azure portal</li>
+                <li>Analyze with Visual Studio or WinDbg</li>
+            </ol>
+        </section>
+
+        <!-- Failed Requests Section -->
+        <section id="failedrequests" class="doc-section">
+            <h2>❌ Failed Requests Simulation</h2>
+            <p>The dashboard includes a <strong>Failed Requests</strong> feature for generating HTTP 5xx errors to test Azure diagnostics tools like AppLens and Application Insights.</p>
+
+            <h3>Purpose</h3>
+            <p>This simulation generates HTTP 500 Internal Server Error responses that are visible in:</p>
+            <ul>
+                <li><strong>AppLens</strong> - Azure Portal → Diagnose and solve problems</li>
+                <li><strong>Application Insights</strong> - Failures blade</li>
+                <li><strong>Azure Monitor</strong> - Error rate alerts</li>
+            </ul>
+
+            <h3>How It Works</h3>
+            <ol>
+                <li>Spawns a background thread to generate requests</li>
+                <li>Each request calls <code>/api/loadtest</code> with 100% error probability</li>
+                <li>The load test endpoint throws a random exception type</li>
+                <li>Each request takes ~1.5 seconds for latency visibility</li>
+            </ol>
+
+            <h3>Exception Types</h3>
+            <p>The simulation randomly throws one of these exception types per request:</p>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Exception Type</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>NullReferenceException</code></td>
+                        <td>Object reference not set to an instance</td>
+                    </tr>
+                    <tr>
+                        <td><code>TimeoutException</code></td>
+                        <td>Operation timed out</td>
+                    </tr>
+                    <tr>
+                        <td><code>InvalidOperationException</code></td>
+                        <td>Operation not valid for current state</td>
+                    </tr>
+                    <tr>
+                        <td><code>ArgumentException</code></td>
+                        <td>Value out of expected range</td>
+                    </tr>
+                    <tr>
+                        <td><code>HttpRequestException</code></td>
+                        <td>Error sending HTTP request</td>
+                    </tr>
+                    <tr>
+                        <td><code>DivideByZeroException</code></td>
+                        <td>Attempted to divide by zero</td>
+                    </tr>
+                    <tr>
+                        <td><code>KeyNotFoundException</code></td>
+                        <td>Key not present in dictionary</td>
+                    </tr>
+                    <tr>
+                        <td><code>IndexOutOfRangeException</code></td>
+                        <td>Index outside array bounds</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Dashboard Event Log</h3>
+            <p>Each failed request appears in the Event Log with:</p>
+            <ul>
+                <li><strong>Brown color</strong> - Distinctive styling for visibility</li>
+                <li><strong>❌ icon</strong> - Failed request indicator</li>
+                <li><strong>Exception type</strong> - The specific exception that was thrown</li>
+                <li><strong>Latency</strong> - Request duration in milliseconds</li>
+            </ul>
+
+            <p>See the <a href="/azure-monitoring-guide.html#failedrequests">Azure Diagnostics Guide</a> for detailed AppLens analysis instructions.</p>
+        </section>
+
+        <!-- API Reference Section -->
+        <section id="api" class="doc-section">
+            <h2>🔌 API Reference</h2>
+            
+            <h3>Health & Monitoring</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/health</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Basic health check</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/health/status</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Detailed health with active simulations</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/health/probe</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Lightweight probe for latency measurement</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/health/build</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Build information and assembly version</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/metrics/current</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Latest metrics snapshot</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/metrics/health</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Detailed health status with warnings</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/admin/stats</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Simulation and resource statistics</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>CPU Stress Simulation</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/cpu/trigger-high-cpu</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Trigger CPU stress</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Request body:</strong></p>
+            <div class="code-block">
+{
+  <span class="string">"durationSeconds"</span>: 30,
+  <span class="string">"targetPercentage"</span>: 100
+}
+            </div>
+            <p><code>durationSeconds</code>: How long to run (default: 30)<br>
+            <code>targetPercentage</code>: Target CPU usage 1-100 (default: 100)</p>
+
+            <h3>Memory Pressure Simulation</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/memory/allocate-memory</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Allocate memory block</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/memory/release-memory</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Release all allocated memory</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/memory/status</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Get current memory allocation status</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Request body (allocate):</strong></p>
+            <div class="code-block">
+{
+  <span class="string">"sizeMegabytes"</span>: 100
+}
+            </div>
+
+            <h3>Thread Pool Starvation Simulation</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/threadblock/trigger-sync-over-async</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Trigger thread blocking</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Request body:</strong></p>
+            <div class="code-block">
+{
+  <span class="string">"delayMilliseconds"</span>: 5000,
+  <span class="string">"concurrentRequests"</span>: 100
+}
+            </div>
+
+            <h3>Slow Request Simulation</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/slowrequest/start</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Start slow request simulation</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/slowrequest/stop</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Stop slow request simulation</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/slowrequest/status</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Get current simulation status</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/slowrequest/scenarios</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Get scenario descriptions for CLR Profiler</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Request body (start):</strong></p>
+            <div class="code-block">{
+  <span class="string">"requestDurationSeconds"</span>: 25,
+  <span class="string">"intervalSeconds"</span>: 2,
+  <span class="string">"maxRequests"</span>: 10
+}</div>
+
+            <h3>Admin Operations</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/admin/stats</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Get current simulation statistics</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Crash Simulation</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/crash/trigger</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Trigger a crash of specified type</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/crash/now</code></td>
+                        <td><span class="method-badge method-get">GET</span> <span class="method-badge method-post">POST</span></td>
+                        <td>Immediate synchronous crash (best for Azure Crash Monitoring)</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/crash/types</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>List available crash types</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/crash/failfast</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Quick FailFast crash trigger</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/crash/stackoverflow</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Quick StackOverflow crash trigger</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Request body (trigger):</strong></p>
+            <div class="code-block">
+{
+  <span class="string">"crashType"</span>: <span class="string">"FailFast"</span>,
+  <span class="string">"delaySeconds"</span>: 3,
+  <span class="string">"message"</span>: <span class="string">"Optional crash message"</span>
+}
+            </div>
+            <p><strong>Available crash types:</strong> <code>FailFast</code> (recommended), <code>AccessViolation</code>, <code>StackOverflow</code>, <code>UnhandledException</code>, <code>OutOfMemory</code></p>
+
+            <h3>Failed Request Simulation</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/failedrequest/start</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Start generating HTTP 500 errors</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/failedrequest/stop</code></td>
+                        <td><span class="method-badge method-post">POST</span></td>
+                        <td>Stop the simulation</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/failedrequest/status</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Get current simulation status</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Request body (start):</strong></p>
+            <div class="code-block">
+{
+  <span class="string">"requestCount"</span>: 10
+}
+            </div>
+            <p><strong>Default:</strong> 10 requests. Each request throws a random exception type (NullReferenceException, TimeoutException, etc.) and takes ~1.5 seconds.</p>
+
+            <h3>Load Test Endpoint (Azure Load Testing)</h3>
+            <p>This endpoint is designed to be targeted by Azure Load Testing or similar load testing tools. Unlike other simulation endpoints, it doesn't have UI controls — it's meant for automated load testing only.</p>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>/api/loadtest</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Execute load test with query parameters</td>
+                    </tr>
+                    <tr>
+                        <td><code>/api/loadtest/stats</code></td>
+                        <td><span class="method-badge method-get">GET</span></td>
+                        <td>Get current concurrent request statistics</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>GET with Query Parameters</h4>
+            <p>The load test endpoint uses query parameters for simplicity. Works with browsers, curl, and any load testing tool:</p>
+            <div class="code-block">
+<span class="comment"># With defaults (tuned for Premium0V3)</span>
+GET /api/loadtest
+
+<span class="comment"># Custom parameters</span>
+GET /api/loadtest?workIterations=500&amp;bufferSizeKb=10000&amp;softLimit=50
+
+<span class="comment"># Thread pool only (no CPU work)</span>
+GET /api/loadtest?workIterations=0&amp;bufferSizeKb=100
+            </div>
+            <p><strong>Parameters:</strong></p>
+            <ul>
+                <li><code>workIterations</code>: SHA256 hash iterations per CPU work cycle (default: 200). Controls CPU intensity.</li>
+                <li><code>bufferSizeKb</code>: Memory buffer held for entire request duration (default: 20000). Creates sustained memory pressure.</li>
+                <li><code>baselineDelayMs</code>: Minimum request duration in milliseconds (default: 500). Combined with degradation delay.</li>
+                <li><code>softLimit</code>: Concurrent requests before degradation begins (default: 25)</li>
+                <li><code>degradationFactor</code>: Additional delay (ms) per request over soft limit (default: 500)</li>
+                <li><code>errorAfter</code>: Seconds before random errors may be thrown (default: 120). Set to 0 to disable.</li>
+                <li><code>errorPercent</code>: Percentage chance (0-100) of throwing a random error after errorAfter threshold (default: 20)</li>
+            </ul>
+            <p><strong>Behavior (Sustained Resource Consumption):</strong></p>
+            <ul>
+                <li><strong>Memory:</strong> Allocated up front and held for entire request duration (visible in Azure Memory metrics)</li>
+                <li><strong>CPU:</strong> Interleaved work cycles (~50ms CPU work + ~50ms sleep) creating ~50% CPU per active thread</li>
+                <li><strong>Thread Pool:</strong> Blocking delay = baselineDelayMs + (concurrent - softLimit) × degradationFactor</li>
+                <li><strong>Random Errors:</strong> After <code>errorAfter</code> seconds, <code>errorPercent</code>% chance of throwing a random exception per check interval (configurable for chaotic testing)</li>
+                <li><strong>Extreme load:</strong> Can reach Azure's 230-second timeout threshold</li>
+            </ul>
+        </section>
+
+        <!-- Configuration Section -->
+        <section id="configuration" class="doc-section">
+            <h2>🔧 Configuration</h2>
+            <p>Configuration is managed through <code>appsettings.json</code>:</p>
+            <div class="code-block">
+{
+  <span class="string">"ProblemSimulator"</span>: {
+    <span class="string">"MetricsCollectionIntervalMs"</span>: 250,
+    <span class="string">"LatencyProbeIntervalMs"</span>: 200
+  }
+}
+            </div>
+            <table class="config-table">
+                <thead>
+                    <tr>
+                        <th>Setting</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>MetricsCollectionIntervalMs</code></td>
+                        <td>How often CPU/Memory/Thread metrics are collected</td>
+                        <td><code>250</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>LatencyProbeIntervalMs</code></td>
+                        <td>Server-side health probe interval (also configurable via <code>HEALTH_PROBE_RATE</code> env var)</td>
+                        <td><code>200</code></td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><strong>Note:</strong> This application is designed to be fully breakable for educational purposes. There are no safety limits on resource consumption — simulations can run until the application crashes or resources are exhausted.</p>
+
+            <h3>Environment Variables</h3>
+            <p>The following environment variables can be configured to customize application behavior. These are optional and primarily useful when deploying to Azure App Service.</p>
+            <table class="config-table">
+                <thead>
+                    <tr>
+                        <th>Variable</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>HEALTH_PROBE_RATE</code></td>
+                        <td>Health probe interval in milliseconds. Controls how often the server sends latency probes. Combined with client-side probes, effective rate is halved. Minimum 100ms.</td>
+                        <td><code>200</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>IDLE_TIMEOUT_MINUTES</code></td>
+                        <td>Minutes of inactivity before suspending health probes. Reduces network traffic and Application Insights telemetry when idle.</td>
+                        <td><code>20</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>PAGE_FOOTER</code></td>
+                        <td>Custom HTML footer text displayed at the bottom of the dashboard. Supports HTML links for attribution.</td>
+                        <td>(empty)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>HEALTH_PROBE_RATE</h4>
+            <p>Controls the interval between server-side health probes. All probes are routed through the Azure frontend to capture realistic end-to-end latency including network hops.</p>
+            <ul>
+                <li><strong>Default:</strong> 200ms (5 probes/sec)</li>
+                <li><strong>Safety limit:</strong> Minimum 100ms to prevent probe overlap</li>
+                <li><strong>Use case:</strong> Increase if CLR profiling shows probe requests overlapping; decrease for finer granularity</li>
+            </ul>
+            <p><strong>Setting via Azure CLI:</strong></p>
+            <div class="code-block">
+az webapp config appsettings set \
+    --resource-group rg-perf-simulator \
+    --name your-app-name \
+    --settings HEALTH_PROBE_RATE=<span class="string">400</span>
+            </div>
+
+            <h4>IDLE_TIMEOUT_MINUTES</h4>
+            <p>When the application is idle (no dashboard connections or load test requests), health probes are automatically suspended to reduce unnecessary network traffic to Azure's frontend, AppLens, and Application Insights.</p>
+            <ul>
+                <li><strong>Default:</strong> 20 minutes</li>
+                <li><strong>Wake-up:</strong> Simply reload the dashboard or send any request</li>
+                <li><strong>Activity sources:</strong> Dashboard connections, load test requests</li>
+            </ul>
+            <p><strong>Setting via Azure CLI:</strong></p>
+            <div class="code-block">
+az webapp config appsettings set \
+    --resource-group rg-perf-simulator \
+    --name your-app-name \
+    --settings IDLE_TIMEOUT_MINUTES=<span class="string">30</span>
+            </div>
+
+            <h4>PAGE_FOOTER</h4>
+            <p>The <code>PAGE_FOOTER</code> environment variable allows you to customize the footer credits displayed on the dashboard. This is useful for attributing tools, teams, or linking to relevant resources.</p>
+            <p><strong>Example Value:</strong></p>
+            <div class="code-block">
+Created by &lt;a href="https://speckit.org/" target="_blank"&gt;SpecKit&lt;/a&gt; and &lt;a href="https://github.com/copilot" target="_blank"&gt;Github Copilot&lt;/a&gt;
+            </div>
+            <p><strong>Setting via Azure CLI:</strong></p>
+            <div class="code-block">
+az webapp config appsettings set \
+    --resource-group rg-perf-simulator \
+    --name your-app-name \
+    --settings PAGE_FOOTER=<span class="string">'Created by &lt;a href="https://speckit.org/" target="_blank"&gt;SpecKit&lt;/a&gt; and &lt;a href="https://github.com/copilot" target="_blank"&gt;Github Copilot&lt;/a&gt;'</span>
+            </div>
+            <p><strong>Setting Locally (PowerShell):</strong></p>
+            <div class="code-block">
+$env:PAGE_FOOTER = <span class="string">'Created by &lt;a href="https://speckit.org/" target="_blank"&gt;SpecKit&lt;/a&gt; and &lt;a href="https://github.com/copilot" target="_blank"&gt;Github Copilot&lt;/a&gt;'</span>
+            </div>
+            <p><strong>Setting Locally (Bash):</strong></p>
+            <div class="code-block">
+<span class="keyword">export</span> PAGE_FOOTER=<span class="string">'Created by &lt;a href="https://speckit.org/" target="_blank"&gt;SpecKit&lt;/a&gt; and &lt;a href="https://github.com/copilot" target="_blank"&gt;Github Copilot&lt;/a&gt;'</span>
+            </div>
+            <p>The footer is retrieved via the <code>/api/config/footer</code> endpoint and rendered in the dashboard's footer section. If <code>PAGE_FOOTER</code> is not set, the footer credits section is hidden.</p>
+        </section>
+
+        <!-- Azure Deployment Section -->
+        <section id="azure" class="doc-section">
+            <h2>☁️ Azure Deployment</h2>
+            
+            <h3>Using Azure CLI</h3>
+            <div class="code-block">
+<span class="comment"># Login to Azure</span>
+az login
+
+<span class="comment"># Create resource group</span>
+az group create --name rg-perf-simulator --location eastus
+
+<span class="comment"># Create App Service plan</span>
+az appservice plan create \
+  --name asp-perf-simulator \
+  --resource-group rg-perf-simulator \
+  --sku B1 \
+  --is-linux
+
+<span class="comment"># Create Web App</span>
+az webapp create \
+  --name your-unique-app-name \
+  --resource-group rg-perf-simulator \
+  --plan asp-perf-simulator \
+  --runtime <span class="string">"DOTNETCORE:10.0"</span>
+
+<span class="comment"># Deploy</span>
+cd src/PerfProblemSimulator
+dotnet publish -c Release
+az webapp deploy \
+  --resource-group rg-perf-simulator \
+  --name your-unique-app-name \
+  --src-path bin/Release/net10.0/publish
+            </div>
+
+            <h3>Recommended Diagnostic Tools</h3>
+            <ul>
+                <li><strong>Diagnose and Solve Problems</strong> - App Service blade for automated diagnosis</li>
+                <li><strong>Application Insights</strong> - For detailed telemetry and performance monitoring</li>
+                <li><strong>Process Explorer</strong> - For real-time process monitoring</li>
+                <li><strong>CPU Profiling</strong> - Capture and analyze CPU traces</li>
+                <li><strong>Memory Dumps</strong> - Analyze memory allocations</li>
+            </ul>
+            <p>See the <a href="/azure-monitoring-guide.html">Azure Diagnostics Guide</a> for detailed instructions.</p>
+        </section>
+
+        <!-- Architecture Section -->
+        <section id="architecture" class="doc-section">
+            <h2>📐 Architecture</h2>
+            <div class="architecture-tree"><span class="folder">src/PerfProblemSimulator/</span>
+├── <span class="folder">Controllers/</span>              <span class="comment"># API endpoints</span>
+│   ├── <span class="file">AdminController.cs</span>
+│   ├── <span class="file">CpuController.cs</span>
+│   ├── <span class="file">CrashController.cs</span>
+│   ├── <span class="file">HealthController.cs</span>
+│   ├── <span class="file">LoadTestController.cs</span>     <span class="comment"># Azure Load Testing endpoint</span>
+│   ├── <span class="file">MemoryController.cs</span>
+│   ├── <span class="file">MetricsController.cs</span>
+│   ├── <span class="file">SlowRequestController.cs</span>
+│   └── <span class="file">ThreadBlockController.cs</span>
+│
+├── <span class="folder">Services/</span>                 <span class="comment"># Business logic</span>
+│   ├── <span class="file">CpuStressService.cs</span>
+│   ├── <span class="file">CrashService.cs</span>
+│   ├── <span class="file">LatencyProbeService.cs</span>
+│   ├── <span class="file">LoadTestService.cs</span>        <span class="comment"># Load test with soft limit degradation</span>
+│   ├── <span class="file">MemoryPressureService.cs</span>
+│   ├── <span class="file">MetricsBroadcastService.cs</span>
+│   ├── <span class="file">MetricsCollector.cs</span>
+│   ├── <span class="file">SimulationTracker.cs</span>
+│   ├── <span class="file">SlowRequestService.cs</span>
+│   ├── <span class="file">ThreadBlockService.cs</span>
+│   ├── <span class="file">ICpuStressService.cs</span>       <span class="comment"># Interfaces</span>
+│   ├── <span class="file">ICrashService.cs</span>
+│   ├── <span class="file">ILoadTestService.cs</span>
+│   ├── <span class="file">IMemoryPressureService.cs</span>
+│   ├── <span class="file">IMetricsCollector.cs</span>
+│   ├── <span class="file">ISlowRequestService.cs</span>
+│   └── <span class="file">IThreadBlockService.cs</span>
+│
+├── <span class="folder">Hubs/</span>                     <span class="comment"># SignalR for real-time updates</span>
+│   ├── <span class="file">MetricsHub.cs</span>
+│   └── <span class="file">IMetricsClient.cs</span>
+│
+├── <span class="folder">Models/</span>                   <span class="comment"># Data transfer objects</span>
+│   ├── <span class="file">AllocatedMemoryBlock.cs</span>
+│   ├── <span class="file">CpuStressRequest.cs</span>
+│   ├── <span class="file">CrashRequest.cs</span>
+│   ├── <span class="file">DetailedMetrics.cs</span>
+│   ├── <span class="file">ErrorResponse.cs</span>
+│   ├── <span class="file">LoadTestRequest.cs</span>        <span class="comment"># Load test parameters</span>
+│   ├── <span class="file">LoadTestResult.cs</span>         <span class="comment"># Load test response</span>
+│   ├── <span class="file">MemoryAllocationRequest.cs</span>
+│   ├── <span class="file">MemoryReleaseResult.cs</span>
+│   ├── <span class="file">MetricsSnapshot.cs</span>
+│   ├── <span class="file">ProblemSimulatorOptions.cs</span>
+│   ├── <span class="file">SimulationResult.cs</span>
+│   ├── <span class="file">SimulationType.cs</span>
+│   ├── <span class="file">SlowRequestRequest.cs</span>
+│   └── <span class="file">ThreadBlockRequest.cs</span>
+│
+├── <span class="folder">Middleware/</span>               <span class="comment"># Request pipeline</span>
+│   └── <span class="file">ProblemEndpointGuard.cs</span>
+│
+└── <span class="folder">wwwroot/</span>                  <span class="comment"># SPA dashboard</span>
+    ├── <span class="file">index.html</span>
+    ├── <span class="file">documentation.html</span>
+    ├── <span class="file">azure-monitoring-guide.html</span>
+    ├── <span class="file">favicon.svg</span>
+    ├── <span class="folder">css/</span>
+    │   └── <span class="file">dashboard.css</span>
+    └── <span class="folder">js/</span>
+        └── <span class="file">dashboard.js</span></div>
+        </section>
+
+        <!-- Azure Load Testing Section -->
+        <section id="load-testing" class="doc-section">
+            <h2>📈 Azure Load Testing</h2>
+            <p>The Performance Problem Simulator includes a dedicated load testing endpoint designed for use with Azure Load Testing. This endpoint simulates realistic application behavior that degrades gracefully under load.</p>
+
+            <h3>Load Test Endpoint</h3>
+            <p>Use the <code>GET /api/loadtest</code> endpoint directly in Azure Load Testing — no JMeter script required:</p>
+            <div class="code-block">
+<span class="comment"># With defaults (tuned for Premium0V3)</span>
+https://your-app.azurewebsites.net/api/loadtest
+
+<span class="comment"># Custom parameters</span>
+https://your-app.azurewebsites.net/api/loadtest?workIterations=500&amp;bufferSizeKb=10000
+            </div>
+
+            <h3>Query Parameters</h3>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Default</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>workIterations</code></td>
+                        <td>200</td>
+                        <td>SHA256 iterations per CPU work cycle</td>
+                    </tr>
+                    <tr>
+                        <td><code>bufferSizeKb</code></td>
+                        <td>20000</td>
+                        <td>Memory buffer held for request duration (KB)</td>
+                    </tr>
+                    <tr>
+                        <td><code>baselineDelayMs</code></td>
+                        <td>500</td>
+                        <td>Minimum request duration (ms)</td>
+                    </tr>
+                    <tr>
+                        <td><code>softLimit</code></td>
+                        <td>25</td>
+                        <td>Concurrent requests before degradation</td>
+                    </tr>
+                    <tr>
+                        <td><code>degradationFactor</code></td>
+                        <td>500</td>
+                        <td>Delay ms added per request over limit</td>
+                    </tr>
+                    <tr>
+                        <td><code>errorAfter</code></td>
+                        <td>120</td>
+                        <td>Seconds before random errors may be thrown (0 to disable)</td>
+                    </tr>
+                    <tr>
+                        <td><code>errorPercent</code></td>
+                        <td>20</td>
+                        <td>Percentage chance (0-100) of random error after threshold</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>What It Tests</h3>
+            <ul>
+                <li><strong>CPU</strong> - Sustained SHA256 cycles (~50% CPU per thread)</li>
+                <li><strong>Memory</strong> - Buffers held for entire request duration</li>
+                <li><strong>Thread Pool</strong> - Graceful degradation under concurrent load</li>
+                <li><strong>Chaos/Errors</strong> - Configurable random exceptions after threshold (default: 120s at 20% probability)</li>
+            </ul>
+
+            <div class="info-box">
+                <strong>📘 Full Documentation:</strong> See the <a href="/azure-monitoring-guide.html#load-testing">Azure Diagnostics Guide</a> for detailed setup instructions, tuning scenarios, and diagnostic techniques.
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Performance Problem Simulator — Educational Tool for Azure App Service Diagnostics</p>
+            <p id="pageFooterContent"></p>
+            <p>Build: <span id="buildTime">--</span></p>
+        </footer>
+        </div><!-- /.doc-container -->
+        </div><!-- /.doc-main -->
+
+        <!-- Right Sidebar Table of Contents -->
+        <aside class="doc-toc">
+            <div class="doc-toc-sticky">
+                <nav class="doc-toc-card">
+                    <div class="doc-toc-title">On This Page</div>
+                    <ul>
+                        <li class="doc-toc-item">
+                            <a href="#overview"><span class="toc-icon">🎯</span>Overview</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#quick-start"><span class="toc-icon">🚀</span>Quick Start</a>
+                        </li>
+                        <li class="doc-toc-divider-item" aria-hidden="true"></li>
+                        <li class="doc-toc-section-item">Features</li>
+                        <li class="doc-toc-item">
+                            <a href="#dashboard"><span class="toc-icon">🎮</span>Dashboard</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#latency"><span class="toc-icon">⏱️</span>Latency Monitor</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#cpu"><span class="toc-icon">🔥</span>CPU Stress</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#memory"><span class="toc-icon">💾</span>Memory Pressure</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#threadpool"><span class="toc-icon">🧵</span>Thread Pool Starvation</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#slowrequest"><span class="toc-icon">🐌</span>Slow Requests</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#crash"><span class="toc-icon">💥</span>Crash Simulation</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#failedrequests"><span class="toc-icon">❌</span>Failed Requests</a>
+                        </li>
+                        <li class="doc-toc-divider-item" aria-hidden="true"></li>
+                        <li class="doc-toc-section-item">Reference</li>
+                        <li class="doc-toc-item">
+                            <a href="#api"><span class="toc-icon">📡</span>API Reference</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#configuration"><span class="toc-icon">⚙️</span>Configuration</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#azure"><span class="toc-icon">☁️</span>Azure Deployment</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#architecture"><span class="toc-icon">🏗️</span>Architecture</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#load-testing"><span class="toc-icon">📈</span>Load Testing</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+    </div><!-- /.doc-layout -->
+
+    <script>
+        // Fetch and display custom page footer and build info
+        (async function() {
+            // Fetch app config for footer
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    const footerEl = document.getElementById('pageFooterContent');
+                    if (footerEl) {
+                        if (config.pageFooter && config.pageFooter.trim()) {
+                            footerEl.innerHTML = config.pageFooter;
+                        } else {
+                            footerEl.style.display = 'none';
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch config', e);
+            }
+            // Fetch build info
+            try {
+                const response = await fetch('/api/health/build');
+                if (response.ok) {
+                    const data = await response.json();
+                    const buildTimeEl = document.getElementById('buildTime');
+                    if (buildTimeEl && data.buildTimestamp) {
+                        const buildDate = new Date(data.buildTimestamp);
+                        buildTimeEl.textContent = buildDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch build info', e);
+            }
+        })();
+    </script>
+
+    <script>
+        // Sidebar drawer toggle
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const sidebarDrawer = document.getElementById('sidebar-drawer');
+        const sidebarClose = document.getElementById('sidebar-close');
+
+        function openSidebar() {
+            hamburgerBtn.classList.remove('attention');
+            hamburgerBtn.classList.add('active');
+            sidebarOverlay.classList.add('active');
+            sidebarDrawer.classList.add('active');
+        }
+
+        function closeSidebar() {
+            hamburgerBtn.classList.remove('active');
+            sidebarOverlay.classList.remove('active');
+            sidebarDrawer.classList.remove('active');
+        }
+
+        hamburgerBtn.addEventListener('click', openSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+        sidebarClose.addEventListener('click', closeSidebar);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeSidebar();
+        });
+
+        // Scroll spy for TOC highlighting
+        const tocLinks = document.querySelectorAll('.doc-toc-item a');
+        const sections = document.querySelectorAll('.doc-section');
+
+        function updateActiveTocLink() {
+            const scrollPos = window.scrollY + 120;
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.offsetHeight;
+                const sectionId = section.getAttribute('id');
+                
+                if (scrollPos >= sectionTop && scrollPos < sectionTop + sectionHeight) {
+                    tocLinks.forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === '#' + sectionId) {
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }
+
+        window.addEventListener('scroll', updateActiveTocLink);
+        updateActiveTocLink(); // Initial call
+
+        // Fetch and display SKU
+        async function fetchAzureSku() {
+            try {
+                const response = await fetch('/api/metrics');
+                const data = await response.json();
+                const skuElement = document.getElementById('skuDisplay');
+                if (skuElement && data.processInfo && data.processInfo.azureSku) {
+                    skuElement.textContent = `SKU: ${data.processInfo.azureSku}`;
+                    skuElement.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to fetch Azure SKU', error);
+            }
+        }
+        fetchAzureSku();
+
+        // Fetch and display build info
+        async function fetchBuildInfo() {
+            try {
+                const response = await fetch('/api/health/build');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.buildTimestamp) {
+                        const buildDate = new Date(data.buildTimestamp);
+                        const formatted = buildDate.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+                        const sidebarBuildTime = document.getElementById('sidebarBuildTime');
+                        if (sidebarBuildTime) sidebarBuildTime.textContent = formatted;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch build info', error);
+            }
+        }
+        fetchBuildInfo();
+    </script>
+</body>
+</html>
