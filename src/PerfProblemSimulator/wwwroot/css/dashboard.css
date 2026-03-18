@@ -867,7 +867,7 @@ body.page-secondary {
     to { opacity: 1; transform: scale(1); }
 }
 
-.simulation-badge.cpu { border: 2px solid var(--color-cpu); }
+.simulation-badge.cpu { border: 2px solid #0078d4; } /* Blue - matches cpu-group border */
 .simulation-badge.memory { border: 2px solid var(--color-memory); }
 .simulation-badge.threadblock { border: 2px solid var(--color-threads); }
 
@@ -967,14 +967,15 @@ body.page-secondary {
 .log-entry.warning { color: var(--color-warning); }
 .log-entry.error { color: var(--color-danger); }
 
-/* Log entry simulation-themed colors */
-.log-entry.cpu { color: var(--color-cpu); }
-.log-entry.memory { color: var(--color-memory); }
-.log-entry.threads { color: var(--color-threads); }
-.log-entry.slowrequest { color: #b8860b; } /* Dark goldenrod for slow requests */
-.log-entry.failedrequests { color: #8B4513; } /* Medium brown for failed requests */
-.log-entry.crash { color: var(--color-danger); }
-.log-entry.loadtest { color: var(--color-primary); } /* .NET theme: blue */
+/* Log entry simulation-themed colors (matching control group borders) */
+.log-entry.cpu { color: #0078d4; } /* Blue - matches cpu-group border */
+.log-entry.memory { color: var(--color-memory); } /* Green - matches memory-group */
+.log-entry.threads { color: var(--color-threads); } /* Purple - matches thread-group */
+.log-entry.slowrequest { color: #ff8c00; } /* Orange - matches slowrequest-group border */
+.log-entry.failedrequests { color: #8B4513; } /* Brown - matches failedrequest-group border */
+.log-entry.crash { color: var(--color-danger); } /* Red - matches crash-group border */
+.log-entry.restart { color: var(--color-danger); } /* Red - app restarts/PID changes */
+.log-entry.loadtest { color: var(--color-primary); } /* .NET theme: purple */
 .log-entry.system { color: var(--color-text-muted); }
 
 .log-icon {

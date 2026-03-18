@@ -327,7 +327,7 @@ function handleMetricsUpdate(snapshot) {
     // Check for application restart (process ID change)
     if (snapshot.processId) {
         if (state.lastProcessId !== null && state.lastProcessId !== snapshot.processId) {
-            logEvent('crash', `APPLICATION RESTARTED! Process ID changed from ${state.lastProcessId} to ${snapshot.processId}. This may indicate an unexpected crash (OOM, StackOverflow, etc.)`, { icon: '🔄' });
+            logEvent('restart', `APPLICATION RESTARTED! Process ID changed from ${state.lastProcessId} to ${snapshot.processId}. This may indicate an unexpected crash (OOM, StackOverflow, etc.)`);
             // Clear all active simulations since the app restarted
             clearAllActiveSimulations();
         }
@@ -1612,6 +1612,7 @@ const LOG_ICONS = {
     slowrequest: '🐌',
     failedrequests: '❌',
     crash: '💥',
+    restart: '🔄',
     loadtest: '📈'
 };
 
