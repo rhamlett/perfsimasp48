@@ -67,9 +67,19 @@ namespace PerfProblemSimulator.Controllers
             // PAGE_FOOTER is read directly from environment variable
             var pageFooter = Environment.GetEnvironmentVariable("PAGE_FOOTER") ?? "";
             
+            // Build GitHub repo URL from environment variables if both are provided
+            var githubRepoName = Environment.GetEnvironmentVariable("GITHUB_REPO_NAME") ?? "";
+            var githubUserName = Environment.GetEnvironmentVariable("GITHUB_USER_NAME") ?? "";
+            var githubRepoUrl = "";
+            if (!string.IsNullOrWhiteSpace(githubRepoName) && !string.IsNullOrWhiteSpace(githubUserName))
+            {
+                githubRepoUrl = $"https://github.com/{githubUserName.Trim()}/{githubRepoName.Trim()}";
+            }
+            
             return Ok(new ClientConfig
             {
                 PageFooter = pageFooter,
+                GithubRepoUrl = githubRepoUrl,
                 LatencyProbeIntervalMs = ConfigurationHelper.LatencyProbeIntervalMs,
                 IdleTimeoutMinutes = _idleStateService.IdleTimeoutMinutes
             });
@@ -85,6 +95,12 @@ namespace PerfProblemSimulator.Controllers
         /// Custom HTML content for the page footer. Empty string if not configured.
         /// </summary>
         public string PageFooter { get; set; } = "";
+
+        /// <summary>
+        /// GitHub repository URL constructed from GITHUB_USER_NAME and GITHUB_REPO_NAME.
+        /// Empty string if not configured.
+        /// </summary>
+        public string GithubRepoUrl { get; set; } = "";
 
         /// <summary>
         /// How often the server sends latency probes in milliseconds.

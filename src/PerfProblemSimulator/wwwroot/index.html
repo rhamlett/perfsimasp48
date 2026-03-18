@@ -80,7 +80,7 @@
             </a>
             <div class="sidebar-divider"></div>
             <div class="sidebar-section-label">External</div>
-            <a href="https://github.com/rhamlett/perfsimasp48" target="_blank" rel="noopener" class="sidebar-nav-item">
+            <a id="githubRepoLink" href="#" target="_blank" rel="noopener" class="sidebar-nav-item" style="display: none;">
                 <span class="nav-icon">🐙</span>
                 <span class="nav-label">GitHub Repository<span class="nav-desc">Source code & issues</span></span>
             </a>
@@ -352,6 +352,35 @@
     </footer>
 
     <script src="js/dashboard.js?v=3"></script>
+    <script>
+        // Fetch and display custom page footer and GitHub repo link
+        (async function() {
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    const footerEl = document.getElementById('pageFooterContent');
+                    if (footerEl) {
+                        if (config.pageFooter && config.pageFooter.trim()) {
+                            footerEl.innerHTML = config.pageFooter;
+                        } else {
+                            footerEl.style.display = 'none';
+                        }
+                    }
+                    // Update GitHub repo link if provided in config
+                    const githubLink = document.getElementById('githubRepoLink');
+                    if (githubLink) {
+                        if (config.githubRepoUrl && config.githubRepoUrl.trim()) {
+                            githubLink.href = config.githubRepoUrl;
+                            githubLink.style.display = '';
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch config', e);
+            }
+        })();
+    </script>
     <script>
         // Sidebar drawer toggle
         const hamburgerBtn = document.getElementById('hamburger-btn');

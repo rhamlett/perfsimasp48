@@ -375,7 +375,7 @@
             </a>
             <div class="sidebar-divider"></div>
             <div class="sidebar-section-label">External</div>
-            <a href="https://github.com/rhamlett/perfsimasp48" target="_blank" rel="noopener" class="sidebar-nav-item">
+            <a id="githubRepoLink" href="#" target="_blank" rel="noopener" class="sidebar-nav-item" style="display: none;">
                 <span class="nav-icon">🐙</span>
                 <span class="nav-label">GitHub Repository<span class="nav-desc">Source code & issues</span></span>
             </a>
@@ -755,6 +755,34 @@ az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GRO
                 <li>Click <strong>Apply</strong>, then <strong>Confirm</strong></li>
             </ol>
 
+            <h3>GitHub Repository Link</h3>
+            <p>Display a link to the GitHub repository in the sidebar menu. The link is hidden by default and only appears when both environment variables are configured.</p>
+            
+            <h4>Environment Variables</h4>
+            <table class="env-table">
+                <thead>
+                    <tr>
+                        <th>Variable Name</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GITHUB_USER_NAME</code></td>
+                        <td>GitHub user or organization name (e.g., <code>contoso</code>)</td>
+                    </tr>
+                    <tr>
+                        <td><code>GITHUB_REPO_NAME</code></td>
+                        <td>Repository name (e.g., <code>perf-simulator</code>)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Setting via Azure CLI</h4>
+            <pre><code># Enable GitHub link in the sidebar menu
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP \
+  --settings GITHUB_USER_NAME=contoso GITHUB_REPO_NAME=perf-simulator</code></pre>
+
         </section>
 
         <section id="troubleshooting" class="card">
@@ -908,17 +936,13 @@ echo "AZURE_SUBSCRIPTION_ID=$SUB_ID"</code></pre>
                     if (githubLink) {
                         if (config.githubRepoUrl && config.githubRepoUrl.trim()) {
                             githubLink.href = config.githubRepoUrl;
-                        } else {
-                            // Hide link if no GitHub URL configured
-                            githubLink.style.display = 'none';
+                            githubLink.style.display = '';
                         }
                     }
                 }
             } catch (e) {
                 console.error('Failed to fetch config', e);
-                // Hide GitHub link on error
-                const githubLink = document.getElementById('githubRepoLink');
-                if (githubLink) githubLink.style.display = 'none';
+            }
             }
             // Fetch build info
             try {
