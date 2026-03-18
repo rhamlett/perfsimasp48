@@ -261,25 +261,25 @@ function initializeSignalR() {
         
         if (change.newState === $.signalR.connectionState.reconnecting) {
             updateConnectionStatus('connecting', 'Reconnecting...');
-            logEvent('system', 'Connection lost. Attempting to reconnect...');
+            logEvent('warning', 'Connection lost. Attempting to reconnect...');
         } else if (change.newState === $.signalR.connectionState.connected) {
             updateConnectionStatus('connected', 'Connected');
             if (change.oldState === $.signalR.connectionState.reconnecting) {
-                logEvent('system', 'Reconnected to server');
+                logEvent('success', 'Reconnected to server');
             }
         }
     });
 
     $.connection.hub.disconnected(function () {
         updateConnectionStatus('disconnected', 'Disconnected');
-        logEvent('system', 'Connection closed. Attempting to reconnect...');
+        logEvent('warning', 'Connection closed. Attempting to reconnect...');
         // Auto-reconnect after close
         setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
     });
 
     $.connection.hub.error(function (error) {
         console.error('SignalR error:', error);
-        logEvent('system', 'SignalR error: ' + (error.message || error));
+        logEvent('warning', 'SignalR error: ' + (error.message || error));
     });
 
     // Hub URL is already set by auto-generated proxy from /hubs/metrics/signalr/hubs
@@ -289,7 +289,7 @@ function initializeSignalR() {
     $.connection.hub.start()
         .done(function () {
             updateConnectionStatus('connected', 'Connected');
-            logEvent('system', 'Connected to metrics hub');
+            logEvent('success', 'Connected to metrics hub');
             state.connection = hub;
             
             // Wake up the server on initial page load
@@ -301,7 +301,7 @@ function initializeSignalR() {
         })
         .fail(function (err) {
             updateConnectionStatus('disconnected', 'Failed to connect');
-            logEvent('system', 'Connection failed: ' + (err.message || err));
+            logEvent('warning', 'Connection failed: ' + (err.message || err));
             // Try again after delay
             setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
         });

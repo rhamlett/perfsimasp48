@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNet.SignalR;
+using Microsoft.AspNet.SignalR.Hubs;
 using Newtonsoft.Json.Linq;
 using NLog;
 using PerfProblemSimulator.Hubs;
@@ -52,7 +53,6 @@ public class FailedRequestService : IFailedRequestService, IDisposable
         private static readonly HttpClient HttpClientInstance = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
         private readonly ISimulationTracker _simulationTracker;
-        private readonly IHubContext<IMetricsClient> _hubContext;
 
         private CancellationTokenSource _cts;
         private Thread _requestSpawnerThread;
@@ -71,7 +71,6 @@ public class FailedRequestService : IFailedRequestService, IDisposable
         {
             if (simulationTracker == null) throw new ArgumentNullException(nameof(simulationTracker));
             _simulationTracker = simulationTracker;
-            _hubContext = GlobalHost.ConnectionManager.GetHubContext<MetricsHub, IMetricsClient>();
         }
 
         public SimulationResult Start(int requestCount)
@@ -305,7 +304,7 @@ public class FailedRequestService : IFailedRequestService, IDisposable
                 }
 
                 // Broadcast latency to dashboard for visibility
-                _hubContext.Clients.All.ReceiveLatency(new LatencyMeasurement
+                BroadcastFailedRequestEvent(new LatencyMeasurement
                 {
                     Timestamp = DateTimeOffset.UtcNow,
                     LatencyMs = stopwatch.ElapsedMilliseconds,
@@ -341,6 +340,23 @@ public class FailedRequestService : IFailedRequestService, IDisposable
             }
         }
 
+        /// <summary>
+        /// Broadcasts a failed request event to all connected dashboard clients.
+        /// Uses untyped hub context with camelCase method names to match JavaScript client.
+        /// </summary>
+        private void BroadcastFailedRequestEvent(LatencyMeasurement measurement)
+        {
+            try
+            {
+                var hubContext = GlobalHost.ConnectionManager.GetHubContext<MetricsHub>();
+                hubContext.Clients.All.receiveLatency(measurement);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error broadcasting failed request event");
+            }
+        }
+
         public void Dispose()
         {
             if (_cts != null)
@@ -350,9 +366,6 @@ public class FailedRequestService : IFailedRequestService, IDisposable
             }
         }
 
-    /// <summary>
-    /// Extracts the exception type from the error response body.
-    /// ASP.NET Core returns exception type in various formats depending on configuration.
         /// <summary>
         /// Extracts the exception type from the error response body.
         /// </summary>
