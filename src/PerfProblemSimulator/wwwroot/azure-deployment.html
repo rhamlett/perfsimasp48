@@ -943,7 +943,6 @@ echo "AZURE_SUBSCRIPTION_ID=$SUB_ID"</code></pre>
             } catch (e) {
                 console.error('Failed to fetch config', e);
             }
-            }
             // Fetch build info
             try {
                 const response = await fetch('/api/health/build');
