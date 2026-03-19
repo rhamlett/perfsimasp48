@@ -48,6 +48,7 @@ namespace PerfProblemSimulator.Services
 
         private readonly Timer _idleCheckTimer;
         private readonly object _stateLock = new object();
+        private readonly System.Threading.ManualResetEventSlim _wakeSignal = new System.Threading.ManualResetEventSlim(false);
 
         private DateTime _lastActivityUtc;
         private bool _isIdle;
@@ -73,6 +74,9 @@ namespace PerfProblemSimulator.Services
 
     /// <inheritdoc />
     public int IdleTimeoutMinutes { get; }
+
+    /// <inheritdoc />
+    public System.Threading.ManualResetEventSlim WakeSignal => _wakeSignal;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="IdleStateService"/> class.
@@ -137,6 +141,8 @@ namespace PerfProblemSimulator.Services
             if (wasIdle)
             {
                 Logger.Info("App waking up from idle state. There may be gaps in diagnostics and logs.");
+                // Signal any waiting threads (like the probe loop) to wake immediately
+                _wakeSignal.Set();
                 var handler = WakingUp;
                 if (handler != null) handler(this, EventArgs.Empty);
                 return true;
@@ -175,6 +181,8 @@ namespace PerfProblemSimulator.Services
 
             if (shouldGoIdle)
             {
+                // Reset the wake signal so it can be set when we wake up
+                _wakeSignal.Reset();
                 Logger.Warn("Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.");
                 var handler = GoingIdle;
                 if (handler != null) handler(this, EventArgs.Empty);
@@ -215,6 +223,7 @@ namespace PerfProblemSimulator.Services
             _disposed = true;
             _idleCheckTimer.Stop();
             _idleCheckTimer.Dispose();
+            _wakeSignal.Dispose();
         }
     }
 }

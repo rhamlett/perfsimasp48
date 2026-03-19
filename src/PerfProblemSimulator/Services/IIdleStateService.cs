@@ -61,5 +61,11 @@ public interface IIdleStateService
     /// </summary>
     /// <returns>True if the application was idle and is now awake, false if already active.</returns>
     bool WakeUp();
+
+    /// <summary>
+    /// Gets a signal that is set when the application wakes from idle.
+    /// Background services can wait on this to be interrupted immediately on wake.
+    /// </summary>
+    System.Threading.ManualResetEventSlim WakeSignal { get; }
     }
 }

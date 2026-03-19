@@ -129,23 +129,22 @@ namespace PerfProblemSimulator.Hubs
         {
             var wasIdle = _idleStateService.WakeUp();
             
-            if (wasIdle)
-            {
-                Logger.Info("Server woken up by client request from: {0}", Context.ConnectionId);
-                // The MetricsBroadcastService will broadcast the wake-up message to all clients
-                // via the WakingUp event, so we don't need to send it directly here
-                return;
-            }
-
-            // Only send direct response when app was already active (not waking up)
-            // to confirm current state to caller
+            // Always send direct response to the caller for immediate feedback
+            // The broadcast service will also notify all clients via WakingUp event
             var idleData = new IdleStateData
             {
-                IsIdle = _idleStateService.IsIdle,
-                Message = "Application is active",
+                IsIdle = false,
+                Message = wasIdle 
+                    ? "App waking up from idle state. There may be gaps in diagnostics and logs."
+                    : "Application is active",
                 Timestamp = DateTimeOffset.UtcNow
             };
             Clients.Caller.receiveIdleState(idleData);
+            
+            if (wasIdle)
+            {
+                Logger.Info("Server woken up by client request from: {0}", Context.ConnectionId);
+            }
         }
     }
 }

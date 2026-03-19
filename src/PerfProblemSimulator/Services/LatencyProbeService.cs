@@ -139,7 +139,9 @@ namespace PerfProblemSimulator.Services
                         // Check if application is idle - don't send probes when idle
                         if (_idleStateService.IsIdle)
                         {
-                            Thread.Sleep(1000);
+                            // Wait on the wake signal with a timeout - this allows immediate wake-up
+                            // when the signal is set, rather than sleeping for the full duration
+                            _idleStateService.WakeSignal.Wait(1000, cancellationToken);
                             continue;
                         }
 
