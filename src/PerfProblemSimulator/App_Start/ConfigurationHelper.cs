@@ -48,7 +48,7 @@ namespace PerfProblemSimulator.App_Start
             get
             {
                 var value = ConfigurationManager.AppSettings["ProblemSimulator:MetricsCollectionIntervalMs"];
-                return int.TryParse(value, out var result) ? result : 1000;
+                return int.TryParse(value, out var result) ? result : 250;
             }
         }
 
@@ -76,7 +76,7 @@ namespace PerfProblemSimulator.App_Start
                     return Math.Max(100, result); // Minimum 100ms safety limit
                 }
 
-                return 200; // Default
+                return 100; // Default
             }
         }
 

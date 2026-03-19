@@ -12,11 +12,13 @@
 // ==========================================================================
 
 const CONFIG = {
-    maxDataPoints: 240,  // 1 minute of data at 250ms intervals
-    maxLatencyDataPoints: 600, // 60 seconds of probe data
-    // latencyProbeIntervalMs is loaded from server config (default 200ms).
-    // Server probes at this interval and broadcasts results via SignalR.
-    latencyProbeIntervalMs: 200,
+    maxDataPoints: 240,  // 60 seconds of data at 250ms intervals
+    maxLatencyDataPoints: 600, // 60 seconds of data at 100ms intervals
+    // Chart update intervals (independent of server data rates)
+    metricsChartIntervalMs: 250,  // Upper charts update rate
+    latencyChartIntervalMs: 100,  // Latency chart update rate
+    // Server probe interval (informational only, actual rate from server)
+    latencyProbeIntervalMs: 100,
     idleTimeoutMinutes: 20,
     latencyTimeoutMs: 30000,
     reconnectDelayMs: 2000,
@@ -151,6 +153,12 @@ const MAX_PROBE_DOTS = 24;
 const state = {
     connection: null,
     charts: {},
+    // Latest values from SignalR (sampled by chart update timers)
+    latestMetrics: null,       // Most recent metrics snapshot
+    latestLatency: null,       // Most recent latency measurement
+    // Chart update timer IDs
+    metricsChartTimerId: null,
+    latencyChartTimerId: null,
     metricsHistory: {
         timestamps: [],
         cpu: [],
@@ -334,7 +342,12 @@ function updateConnectionStatus(status, text) {
 
 /**
  * Handle incoming metrics snapshot from SignalR.
- * Updates all dashboard elements with the latest data.
+ * Stores the latest data for chart sampling and updates UI cards immediately.
+ * 
+ * ARCHITECTURE NOTE: Chart updates are decoupled from SignalR data arrival.
+ * - SignalR delivers data at server's MetricsCollectionIntervalMs rate
+ * - Chart updates at fixed CONFIG.metricsChartIntervalMs (250ms)
+ * - This ensures consistent 60-second display regardless of server rate
  */
 function handleMetricsUpdate(snapshot) {
     // Check for application restart (process ID change)
@@ -347,9 +360,11 @@ function handleMetricsUpdate(snapshot) {
         state.lastProcessId = snapshot.processId;
     }
 
-    // Update metric cards
+    // Store latest snapshot for chart sampling timer
+    state.latestMetrics = snapshot;
+
+    // Update metric cards immediately for responsive UI
     updateMetricCard('cpu', snapshot.cpuPercent, '%', 100);
-    // Use actual available memory from server for dynamic thresholds
     const memoryMax = snapshot.totalAvailableMemoryMb || 1000;
     updateMetricCard('memory', snapshot.workingSetMb, 'MB', memoryMax);
     updateMetricCard('threads', snapshot.threadPoolThreads, 'threads', 100);
@@ -364,18 +379,13 @@ function handleMetricsUpdate(snapshot) {
         totalMemoryEl.textContent = `of ${totalFormatted}`;
     }
 
-    // Update history for charts
-    const timestamp = new Date(snapshot.timestamp);
-    addToHistory(timestamp, snapshot);
-    
-    // Update charts
-    updateCharts();
-    
     // Update last update time (element may not exist in all layouts)
     const lastUpdateEl = document.getElementById('lastUpdate');
     if (lastUpdateEl) {
-        lastUpdateEl.textContent = formatUtcTime(timestamp) + ' UTC';
+        lastUpdateEl.textContent = formatUtcTime(new Date(snapshot.timestamp)) + ' UTC';
     }
+    
+    // NOTE: Chart history is updated by sampledMetricsChartUpdate() timer, not here
 }
 
 function updateMetricCard(type, value, unit, maxForBar) {
@@ -701,17 +711,97 @@ function updateCharts() {
 }
 
 // ==========================================================================
+// Chart Sampling Timers (Decoupled from Server Data Rate)
+// ==========================================================================
+
+/**
+ * Starts the fixed-interval chart update timers.
+ * This decouples chart display rate from server data collection rate.
+ * 
+ * - Metrics chart: samples at 250ms intervals (240 points = 60 seconds)
+ * - Latency chart: samples at 100ms intervals (600 points = 60 seconds)
+ */
+function startChartUpdateTimers() {
+    // Metrics chart timer (250ms)
+    if (state.metricsChartTimerId) {
+        clearInterval(state.metricsChartTimerId);
+    }
+    state.metricsChartTimerId = setInterval(sampledMetricsChartUpdate, CONFIG.metricsChartIntervalMs);
+    
+    // Latency chart timer (100ms)
+    if (state.latencyChartTimerId) {
+        clearInterval(state.latencyChartTimerId);
+    }
+    state.latencyChartTimerId = setInterval(sampledLatencyChartUpdate, CONFIG.latencyChartIntervalMs);
+    
+    console.log(`Chart timers started: metrics=${CONFIG.metricsChartIntervalMs}ms, latency=${CONFIG.latencyChartIntervalMs}ms`);
+}
+
+/**
+ * Stops the chart update timers.
+ */
+function stopChartUpdateTimers() {
+    if (state.metricsChartTimerId) {
+        clearInterval(state.metricsChartTimerId);
+        state.metricsChartTimerId = null;
+    }
+    if (state.latencyChartTimerId) {
+        clearInterval(state.latencyChartTimerId);
+        state.latencyChartTimerId = null;
+    }
+}
+
+/**
+ * Samples the latest metrics and adds to chart history.
+ * Called every CONFIG.metricsChartIntervalMs (250ms).
+ */
+function sampledMetricsChartUpdate() {
+    if (!state.latestMetrics) {
+        return; // No data received yet
+    }
+    
+    // Use current time for consistent chart time axis
+    const timestamp = new Date();
+    addToHistory(timestamp, state.latestMetrics);
+    updateCharts();
+}
+
+/**
+ * Samples the latest latency and adds to chart history.
+ * Called every CONFIG.latencyChartIntervalMs (100ms).
+ */
+function sampledLatencyChartUpdate() {
+    if (!state.latestLatency) {
+        return; // No data received yet
+    }
+    
+    // Use current time for consistent chart time axis
+    const timestamp = new Date();
+    addLatencyToHistory(
+        timestamp,
+        state.latestLatency.latencyMs,
+        state.latestLatency.isTimeout,
+        state.latestLatency.isError
+    );
+    updateLatencyChart();
+}
+
+// ==========================================================================
 // Latency Monitoring
 // ==========================================================================
 
 /**
  * Handle incoming latency measurement from server-side probe.
- * This shows the impact of thread pool starvation on request processing time.
+ * Stores the latest data for chart sampling and updates UI immediately.
+ * 
+ * ARCHITECTURE NOTE: Chart updates are decoupled from probe arrival.
+ * - Server probes at LatencyProbeIntervalMs (configurable via HEALTH_PROBE_RATE)
+ * - Chart updates at fixed CONFIG.latencyChartIntervalMs (100ms)
+ * - This ensures consistent 60-second display regardless of probe rate
  */
 function handleLatencyUpdate(measurement) {
-    // Log significant latency events to the dashboard log
+    // Log significant latency events to the dashboard log (immediate)
     if (measurement.isError) {
-        // Check if this is from the failed request simulation
         if (measurement.source === 'FailedRequest') {
             const errorType = measurement.errorMessage || 'HTTP 5xx';
             logEvent('failedrequests', `Failed Request: ${errorType} (${formatLatency(measurement.latencyMs)})`);
@@ -721,21 +811,24 @@ function handleLatencyUpdate(measurement) {
     } else if (measurement.isTimeout) {
         logEvent('system', `Health Probe Critical (>30s): ${formatLatency(measurement.latencyMs)}`);
     } else if (measurement.latencyMs > 10000) {
-        // Log extremely high latency (starvation) - yellow warning
         logEvent('warning', `High Latency Probe: ${formatLatency(measurement.latencyMs)}`);
     }
     
-    const timestamp = new Date(measurement.timestamp);
-    const latencyMs = measurement.latencyMs;
-    const isTimeout = measurement.isTimeout;
-    const isError = measurement.isError;
+    // Store latest measurement for chart sampling timer
+    state.latestLatency = {
+        timestamp: new Date(measurement.timestamp),
+        latencyMs: measurement.latencyMs,
+        isTimeout: measurement.isTimeout,
+        isError: measurement.isError
+    };
 
-    addLatencyToHistory(timestamp, latencyMs, isTimeout, isError);
-    updateLatencyDisplay(latencyMs, isTimeout, isError);
-    updateLatencyChart();
+    // Update latency display immediately for responsive UI
+    updateLatencyDisplay(measurement.latencyMs, measurement.isTimeout, measurement.isError);
     
-    // Update probe visualization dots
-    updateProbeVisualization(latencyMs);
+    // Update probe visualization dots immediately
+    updateProbeVisualization(measurement.latencyMs);
+    
+    // NOTE: Chart history is updated by sampledLatencyChartUpdate() timer, not here
 }
 
 /**
@@ -1805,6 +1898,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Start SignalR connection (receives probe results from server)
     initializeSignalR();
+    
+    // Start fixed-interval chart update timers (decoupled from server data rate)
+    startChartUpdateTimers();
 
     
     // Wire up button handlers
@@ -1826,7 +1922,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wire up side panel toggle
     initializeSidePanel();
     
-    logEvent('system', `Dashboard initialized (probe rate: ${CONFIG.latencyProbeIntervalMs}ms, idle timeout: ${CONFIG.idleTimeoutMinutes}m)`);
+    logEvent('system', `Dashboard initialized (chart rates: metrics ${CONFIG.metricsChartIntervalMs}ms, latency ${CONFIG.latencyChartIntervalMs}ms)`);
 });
 
 // ==========================================================================
