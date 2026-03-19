@@ -110,17 +110,14 @@ namespace PerfProblemSimulator.Services
             // Wait for the server to fully start and accept connections
             Thread.Sleep(5000);
 
-            // Get the base URL
-            var baseUrl = _baseUrl ?? GetProbeBaseUrl();
-            Logger.Info("Latency probe targeting: {0}/api/health/probe", baseUrl);
+            // Track current URL and HttpClient - will be recreated if URL changes
+            string currentBaseUrl = null;
+            HttpClient httpClient = null;
+            DateTime lastUrlCheck = DateTime.MinValue;
+            const int UrlRecheckSeconds = 30; // Recheck URL every 30s when on localhost
 
-            // Create HttpClient for probes
-            using (var httpClient = new HttpClient())
+            try
             {
-                httpClient.BaseAddress = new Uri(baseUrl);
-                httpClient.Timeout = TimeSpan.FromMilliseconds(RequestTimeoutMs);
-                httpClient.DefaultRequestHeaders.Add("User-Agent", "LatencyProbe/1.0");
-
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     try
@@ -130,6 +127,36 @@ namespace PerfProblemSimulator.Services
                         {
                             Thread.Sleep(1000);
                             continue;
+                        }
+
+                        // Resolve URL on first run, or periodically recheck if on localhost
+                        var now = DateTime.UtcNow;
+                        var shouldRecheckUrl = currentBaseUrl == null 
+                            || (IsLocalhostUrl(currentBaseUrl) && (now - lastUrlCheck).TotalSeconds >= UrlRecheckSeconds);
+
+                        if (shouldRecheckUrl)
+                        {
+                            lastUrlCheck = now;
+                            var newBaseUrl = GetProbeBaseUrl();
+
+                            if (currentBaseUrl != newBaseUrl)
+                            {
+                                // URL changed - recreate HttpClient
+                                if (httpClient != null)
+                                {
+                                    httpClient.Dispose();
+                                }
+
+                                currentBaseUrl = newBaseUrl;
+                                httpClient = new HttpClient
+                                {
+                                    BaseAddress = new Uri(currentBaseUrl),
+                                    Timeout = TimeSpan.FromMilliseconds(RequestTimeoutMs)
+                                };
+                                httpClient.DefaultRequestHeaders.Add("User-Agent", "LatencyProbe/1.0");
+
+                                Logger.Info("Latency probe targeting: {0}/api/health/probe", currentBaseUrl);
+                            }
                         }
 
                         // Check if Slow Request simulation is running
@@ -163,6 +190,21 @@ namespace PerfProblemSimulator.Services
                     }
                 }
             }
+            finally
+            {
+                if (httpClient != null)
+                {
+                    httpClient.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checks if the URL is a localhost URL.
+        /// </summary>
+        private static bool IsLocalhostUrl(string url)
+        {
+            return url != null && (url.Contains("localhost") || url.Contains("127.0.0.1"));
         }
 
         /// <summary>
@@ -247,25 +289,48 @@ namespace PerfProblemSimulator.Services
         /// <summary>
         /// Gets the base URL for the probe endpoint.
         /// </summary>
+        /// <remarks>
+        /// Priority order:
+        /// 1. WEBSITE_HOSTNAME - Full Azure App Service hostname (e.g., myapp.azurewebsites.net)
+        /// 2. WEBSITE_SITE_NAME - Construct URL from site name (e.g., myapp → https://myapp.azurewebsites.net)
+        /// 3. CONTAINER_APP_HOSTNAME - Azure Container Apps hostname
+        /// 4. Localhost fallback for local development only
+        /// 
+        /// IMPORTANT: In Azure, probes MUST go through the public URL to be visible in AppLens.
+        /// Localhost requests bypass the Azure frontend and won't appear in diagnostics.
+        /// </remarks>
         private string GetProbeBaseUrl()
         {
-            // Check if running in Azure App Service
+            // Check if running in Azure App Service via WEBSITE_HOSTNAME
             var websiteHostname = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME");
             if (!string.IsNullOrEmpty(websiteHostname))
             {
-                Logger.Info("Detected Azure App Service environment: {0}", websiteHostname);
-                return "https://" + websiteHostname;
+                var url = "https://" + websiteHostname;
+                Logger.Info("Using Azure App Service URL for probes: {0} (from WEBSITE_HOSTNAME)", url);
+                return url;
             }
 
-            // Check if running in a container
+            // Fallback: construct URL from WEBSITE_SITE_NAME if available
+            var websiteSiteName = Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME");
+            if (!string.IsNullOrEmpty(websiteSiteName))
+            {
+                var url = "https://" + websiteSiteName + ".azurewebsites.net";
+                Logger.Info("Using constructed Azure App Service URL for probes: {0} (from WEBSITE_SITE_NAME)", url);
+                return url;
+            }
+
+            // Check if running in Azure Container Apps
             var containerHostname = Environment.GetEnvironmentVariable("CONTAINER_APP_HOSTNAME");
             if (!string.IsNullOrEmpty(containerHostname))
             {
-                Logger.Info("Detected Container Apps environment: {0}", containerHostname);
-                return "https://" + containerHostname;
+                var url = "https://" + containerHostname;
+                Logger.Info("Using Azure Container Apps URL for probes: {0}", url);
+                return url;
             }
 
-            // Default to localhost:5000 for self-hosted local development (matches Program.cs)
+            // Local development fallback - warn that probes won't be visible in AppLens
+            Logger.Warn("No Azure environment detected (WEBSITE_HOSTNAME, WEBSITE_SITE_NAME, CONTAINER_APP_HOSTNAME all empty). " +
+                "Using localhost:5000 - probes will NOT be visible in AppLens or Azure diagnostics.");
             return "http://localhost:5000";
         }
 
