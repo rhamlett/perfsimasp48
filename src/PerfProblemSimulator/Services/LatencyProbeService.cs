@@ -129,6 +129,7 @@ namespace PerfProblemSimulator.Services
             HttpClient httpClient = null;
             DateTime lastUrlCheck = DateTime.MinValue;
             const int UrlRecheckSeconds = 30; // Recheck URL every 30s when on localhost
+            bool wasIdle = false; // Track if we were idle in previous iteration
 
             try
             {
@@ -139,10 +140,21 @@ namespace PerfProblemSimulator.Services
                         // Check if application is idle - don't send probes when idle
                         if (_idleStateService.IsIdle)
                         {
+                            if (!wasIdle)
+                            {
+                                wasIdle = true;
+                            }
                             // Wait on the wake signal with a timeout - this allows immediate wake-up
                             // when the signal is set, rather than sleeping for the full duration
                             _idleStateService.WakeSignal.Wait(1000, cancellationToken);
                             continue;
+                        }
+
+                        // Check if we just woke up from idle
+                        if (wasIdle)
+                        {
+                            wasIdle = false;
+                            _forceUrlRecheck = true; // Force URL recheck on wake
                         }
 
                         // Resolve URL on first run, when waking from idle, or periodically if on localhost

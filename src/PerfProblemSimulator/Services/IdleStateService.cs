@@ -1,41 +1,40 @@
 using System;
+using System.Threading;
 using System.Timers;
 using NLog;
 using Timer = System.Timers.Timer;
 
 namespace PerfProblemSimulator.Services
 {
-
-/// <summary>
-/// Implementation of idle state management to reduce unnecessary network traffic.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <strong>PURPOSE:</strong>
-/// Manages application idle state to prevent unnecessary health probe traffic when
-/// the dashboard is not actively being used. This reduces noise in AppLens and
-/// Application Insights diagnostics.
-/// </para>
-/// <para>
-/// <strong>ALGORITHM:</strong>
-/// <list type="number">
-/// <item>Timer checks for inactivity every minute</item>
-/// <item>If no activity for the configured timeout (default 20 min), go idle</item>
-/// <item>Fire GoingIdle event to notify services to stop probing</item>
-/// <item>When dashboard reconnects or activity occurs, wake up</item>
-/// <item>Fire WakingUp event to notify services to resume probing</item>
-/// </list>
-/// </para>
-/// <para>
-/// <strong>THREAD SAFETY:</strong>
-/// Uses volatile and lock-free operations where possible. The idle state flag
-/// is protected by lock since it requires coordinated read-modify-write with events.
-/// </para>
-/// </remarks>
+    /// <summary>
+    /// Implementation of idle state management to reduce unnecessary network traffic.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <strong>PURPOSE:</strong>
+    /// Manages application idle state to prevent unnecessary health probe traffic when
+    /// the dashboard is not actively being used. This reduces noise in AppLens and
+    /// Application Insights diagnostics.
+    /// </para>
+    /// <para>
+    /// <strong>ALGORITHM:</strong>
+    /// <list type="number">
+    /// <item>Timer checks for inactivity every minute</item>
+    /// <item>If no activity for the configured timeout (default 20 min), go idle</item>
+    /// <item>Fire GoingIdle event to notify services to stop probing</item>
+    /// <item>When dashboard reconnects (page reload) or WakeUp() is called, wake up</item>
+    /// <item>Fire WakingUp event to notify services to resume probing</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// <strong>THREAD SAFETY:</strong>
+    /// All state changes are protected by a lock. The probe loop polls IsIdle directly.
+    /// </para>
+    /// </remarks>
     public class IdleStateService : IIdleStateService, IDisposable
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        
+
         /// <summary>
         /// Default idle timeout in minutes.
         /// </summary>
@@ -48,10 +47,9 @@ namespace PerfProblemSimulator.Services
 
         private readonly Timer _idleCheckTimer;
         private readonly object _stateLock = new object();
-        private readonly System.Threading.ManualResetEventSlim _wakeSignal = new System.Threading.ManualResetEventSlim(false);
 
         private DateTime _lastActivityUtc;
-        private bool _isIdle;
+        private volatile bool _isIdle;
         private bool _disposed;
 
         /// <inheritdoc />
@@ -60,23 +58,14 @@ namespace PerfProblemSimulator.Services
         /// <inheritdoc />
         public event EventHandler WakingUp;
 
-    /// <inheritdoc />
-    public bool IsIdle
-    {
-        get
-        {
-            lock (_stateLock)
-            {
-                return _isIdle;
-            }
-        }
-    }
+        /// <inheritdoc />
+        public bool IsIdle => _isIdle;
 
-    /// <inheritdoc />
-    public int IdleTimeoutMinutes { get; }
+        /// <inheritdoc />
+        public int IdleTimeoutMinutes { get; }
 
-    /// <inheritdoc />
-    public System.Threading.ManualResetEventSlim WakeSignal => _wakeSignal;
+        /// <inheritdoc />
+        public ManualResetEventSlim WakeSignal { get; } = new ManualResetEventSlim(false);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="IdleStateService"/> class.
@@ -106,21 +95,20 @@ namespace PerfProblemSimulator.Services
             bool wasIdle;
             lock (_stateLock)
             {
-                _lastActivityUtc = DateTime.UtcNow;
                 wasIdle = _isIdle;
+                _lastActivityUtc = DateTime.UtcNow;
 
-                // If we were idle, wake up
                 if (_isIdle)
                 {
                     _isIdle = false;
+                    WakeSignal.Set();
                 }
             }
 
             if (wasIdle)
             {
                 Logger.Info("App waking up from idle state due to recorded activity. There may be gaps in diagnostics and logs.");
-                var handler = WakingUp;
-                if (handler != null) handler(this, EventArgs.Empty);
+                OnWakingUp();
             }
         }
 
@@ -131,29 +119,32 @@ namespace PerfProblemSimulator.Services
             lock (_stateLock)
             {
                 wasIdle = _isIdle;
+                _lastActivityUtc = DateTime.UtcNow;
+
                 if (_isIdle)
                 {
                     _isIdle = false;
-                    _lastActivityUtc = DateTime.UtcNow;
+                    WakeSignal.Set();
                 }
             }
 
             if (wasIdle)
             {
                 Logger.Info("App waking up from idle state. There may be gaps in diagnostics and logs.");
-                // Signal any waiting threads (like the probe loop) to wake immediately
-                _wakeSignal.Set();
-                var handler = WakingUp;
-                if (handler != null) handler(this, EventArgs.Empty);
+                OnWakingUp();
                 return true;
             }
 
-            // Not idle, but still record activity
-            lock (_stateLock)
-            {
-                _lastActivityUtc = DateTime.UtcNow;
-            }
             return false;
+        }
+
+        /// <summary>
+        /// Fires the WakingUp event.
+        /// </summary>
+        private void OnWakingUp()
+        {
+            var handler = WakingUp;
+            handler?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -166,7 +157,6 @@ namespace PerfProblemSimulator.Services
             {
                 if (_isIdle)
                 {
-                    // Already idle
                     return;
                 }
 
@@ -176,16 +166,15 @@ namespace PerfProblemSimulator.Services
                 if (shouldGoIdle)
                 {
                     _isIdle = true;
+                    WakeSignal.Reset();
                 }
             }
 
             if (shouldGoIdle)
             {
-                // Reset the wake signal so it can be set when we wake up
-                _wakeSignal.Reset();
                 Logger.Warn("Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.");
                 var handler = GoingIdle;
-                if (handler != null) handler(this, EventArgs.Empty);
+                handler?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -201,8 +190,7 @@ namespace PerfProblemSimulator.Services
                 return DefaultIdleTimeoutMinutes;
             }
 
-            int timeoutMinutes;
-            if (int.TryParse(envValue, out timeoutMinutes) && timeoutMinutes > 0)
+            if (int.TryParse(envValue, out var timeoutMinutes) && timeoutMinutes > 0)
             {
                 Logger.Info("Using custom idle timeout from {0}: {1} minutes", IdleTimeoutEnvVar, timeoutMinutes);
                 return timeoutMinutes;
@@ -223,7 +211,7 @@ namespace PerfProblemSimulator.Services
             _disposed = true;
             _idleCheckTimer.Stop();
             _idleCheckTimer.Dispose();
-            _wakeSignal.Dispose();
+            WakeSignal.Dispose();
         }
     }
 }
