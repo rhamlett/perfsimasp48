@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Local Development Host for PerfProblemSimulator
+    
+    This is a simple console app that hosts the main library using OWIN self-host.
+    Use this for local F5 debugging. The main PerfProblemSimulator project deploys to Azure.
+  -->
+  
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PerfProblemSimulator\PerfProblemSimulator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Owin.SelfHost" Version="4.2.2" />
+  </ItemGroup>
+</Project>

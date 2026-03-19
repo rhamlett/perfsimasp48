@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run PerfProblemSimulator",
+            "name": "Run Local",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/PerfProblemSimulator/bin/Debug/PerfProblemSimulator.exe",
+            "preLaunchTask": "build-localhost",
+            "program": "${workspaceFolder}/src/PerfProblemSimulator.LocalHost/bin/Debug/net48/PerfProblemSimulator.LocalHost.exe",
             "args": [],
             "cwd": "${workspaceFolder}/src/PerfProblemSimulator",
             "console": "integratedTerminal",

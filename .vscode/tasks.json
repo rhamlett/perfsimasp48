@@ -14,6 +14,22 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "build-localhost",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/src/PerfProblemSimulator.LocalHost/PerfProblemSimulator.LocalHost.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "watch",
             "command": "dotnet",
             "type": "process",
@@ -24,33 +40,6 @@
                 "${workspaceFolder}/src/PerfProblemSimulator/PerfProblemSimulator.csproj"
             ],
             "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "run",
-            "type": "shell",
-            "command": "${workspaceFolder}/src/PerfProblemSimulator/bin/Debug/PerfProblemSimulator.exe",
-            "dependsOn": "build",
-            "problemMatcher": [],
-            "presentation": {
-                "reveal": "always",
-                "panel": "new"
-            }
-        },
-        {
-            "label": "iisexpress",
-            "type": "shell",
-            "command": "& 'C:\\Program Files\\IIS Express\\iisexpress.exe' /path:${workspaceFolder}\\src\\PerfProblemSimulator /port:5000",
-            "dependsOn": "build",
-            "isBackground": true,
-            "problemMatcher": [],
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated"
-            },
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
         }
     ]
 }
