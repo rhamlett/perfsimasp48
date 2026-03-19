@@ -389,9 +389,15 @@ function updateMetricCard(type, value, unit, maxForBar) {
     
     const card = valueEl.closest('.metric-card');
     
-    // Format value
-    const displayValue = typeof value === 'number' ? 
-        (value < 10 ? value.toFixed(1) : Math.round(value)) : '--';
+    // Format value - saturation % gets 2 decimal places for precision
+    let displayValue = '--';
+    if (typeof value === 'number') {
+        if (type === 'queue') {
+            displayValue = value.toFixed(2);
+        } else {
+            displayValue = value < 10 ? value.toFixed(1) : Math.round(value);
+        }
+    }
     valueEl.textContent = displayValue;
     
     // Update bar
