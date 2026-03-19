@@ -329,6 +329,11 @@ body.page-secondary {
     margin-top: 0.125rem;
 }
 
+/* Hidden by default - shown via JS when GitHub repo URL is configured */
+#githubRepoLink {
+    display: none;
+}
+
 .sidebar-divider {
     height: 1px;
     background: rgba(255,255,255,0.1);

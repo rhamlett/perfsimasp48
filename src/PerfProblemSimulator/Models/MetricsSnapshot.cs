@@ -51,9 +51,14 @@ public struct MetricsSnapshot
     public int ThreadPoolThreads { get; set; }
 
     /// <summary>
-    /// Number of work items waiting in the thread pool queue.
+    /// Thread pool saturation percentage (0-100).
     /// </summary>
-    public long ThreadPoolQueueLength { get; set; }
+    /// <remarks>
+    /// Calculated as (ActiveThreads / MaxThreads) * 100.
+    /// Note: ThreadPool.PendingWorkItemCount is not available in .NET Framework 4.8,
+    /// so we show saturation % instead which indicates how close we are to running out of threads.
+    /// </remarks>
+    public double ThreadPoolSaturationPercent { get; set; }
 
     /// <summary>
     /// Number of currently active simulations.

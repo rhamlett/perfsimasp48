@@ -80,7 +80,7 @@
             </a>
             <div class="sidebar-divider"></div>
             <div class="sidebar-section-label">External</div>
-            <a id="githubRepoLink" href="#" target="_blank" rel="noopener" class="sidebar-nav-item" style="display: none;">
+            <a id="githubRepoLink" href="#" target="_blank" rel="noopener" class="sidebar-nav-item">
                 <span class="nav-icon">🐙</span>
                 <span class="nav-label">GitHub Repository<span class="nav-desc">Source code & issues</span></span>
             </a>
@@ -258,12 +258,12 @@
 
             <div class="metric-card queue">
                 <div class="metric-header">
-                    <div class="metric-icon">📋</div>
-                    <div class="metric-label">Queue Length <span class="metric-tooltip" data-tooltip="Pending work items waiting for thread pool execution">ⓘ</span></div>
+                    <div class="metric-icon">⚡</div>
+                    <div class="metric-label">Saturation <span class="metric-tooltip" data-tooltip="Thread pool saturation % (ActiveThreads / MaxThreads). High values indicate thread pool exhaustion risk.">ⓘ</span></div>
                 </div>
                 <div class="metric-info">
                     <div class="metric-value" id="queueValue">--</div>
-                    <div class="metric-unit">pending</div>
+                    <div class="metric-unit">%</div>
                 </div>
                 <div class="metric-bar">
                     <div class="metric-bar-fill" id="queueBar"></div>
@@ -351,7 +351,7 @@
         <p>Build: <span id="buildTime">--</span></p>
     </footer>
 
-    <script src="js/dashboard.js?v=3"></script>
+    <script src="js/dashboard.js?v=5"></script>
     <script>
         // Fetch and display custom page footer and GitHub repo link
         (async function() {

@@ -143,16 +143,22 @@ namespace PerfProblemSimulator.Services
                             if (!wasIdle)
                             {
                                 wasIdle = true;
+                                Logger.Debug("LatencyProbeService: Entering idle wait state");
                             }
                             // Wait on the wake signal with a timeout - this allows immediate wake-up
                             // when the signal is set, rather than sleeping for the full duration
-                            _idleStateService.WakeSignal.Wait(1000, cancellationToken);
+                            var signaled = _idleStateService.WakeSignal.Wait(1000, cancellationToken);
+                            if (signaled)
+                            {
+                                Logger.Debug("LatencyProbeService: Wake signal received");
+                            }
                             continue;
                         }
 
                         // Check if we just woke up from idle
                         if (wasIdle)
                         {
+                            Logger.Info("LatencyProbeService: Resuming probes after idle");
                             wasIdle = false;
                             _forceUrlRecheck = true; // Force URL recheck on wake
                         }

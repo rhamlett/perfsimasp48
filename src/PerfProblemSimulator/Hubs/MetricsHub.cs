@@ -127,6 +127,8 @@ namespace PerfProblemSimulator.Hubs
         [UsedImplicitly]
         public void WakeUp()
         {
+            Logger.Debug("WakeUp called from client: {0}, current idle state: {1}", Context.ConnectionId, _idleStateService.IsIdle);
+            
             var wasIdle = _idleStateService.WakeUp();
             
             // Always send direct response to the caller for immediate feedback
@@ -140,6 +142,8 @@ namespace PerfProblemSimulator.Hubs
                 Timestamp = DateTimeOffset.UtcNow
             };
             Clients.Caller.receiveIdleState(idleData);
+            
+            Logger.Debug("WakeUp response sent to client: {0}, wasIdle: {1}", Context.ConnectionId, wasIdle);
             
             if (wasIdle)
             {

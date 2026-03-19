@@ -268,11 +268,10 @@ function initializeSignalR() {
             if (change.oldState === $.signalR.connectionState.reconnecting) {
                 logEvent('success', 'Reconnected to server');
                 // After reconnect, call WakeUp to wake server and get current idle state
-                try {
-                    $.connection.metricsHub.server.wakeUp();
-                } catch (err) {
-                    console.warn('Failed to invoke WakeUp after reconnect:', err);
-                }
+                $.connection.metricsHub.server.wakeUp()
+                    .fail(function(err) {
+                        console.error('WakeUp after reconnect failed:', err);
+                    });
             }
         }
     });
@@ -289,7 +288,8 @@ function initializeSignalR() {
         logEvent('warning', 'SignalR error: ' + (error.message || error));
     });
 
-    // Hub URL is already set by auto-generated proxy from /hubs/metrics/signalr/hubs
+    // Note: Hub URL is set by the auto-generated proxy script at /hubs/metrics/signalr/hubs
+    // It sets: $.hubConnection("/hubs/metrics/signalr", { useDefaultPath: false })
 
     // Start connection
     updateConnectionStatus('connecting', 'Connecting...');
@@ -302,11 +302,11 @@ function initializeSignalR() {
             
             // Wake up the server on initial page load
             // This also triggers a response with the current idle state
-            try {
-                hub.server.wakeUp();
-            } catch (err) {
-                console.warn('Failed to invoke WakeUp on initial connect:', err);
-            }
+            hub.server.wakeUp()
+                .fail(function(err) {
+                    console.error('WakeUp call failed:', err);
+                    logEvent('warning', 'Failed to wake server: ' + (err.message || err));
+                });
         })
         .fail(function (err) {
             updateConnectionStatus('disconnected', 'Failed to connect');
@@ -320,8 +320,12 @@ function updateConnectionStatus(status, text) {
     const indicator = document.getElementById('connectionIndicator');
     const textEl = document.getElementById('connectionText');
     
-    indicator.className = `indicator ${status}`;
-    textEl.textContent = text;
+    if (indicator) {
+        indicator.className = `indicator ${status}`;
+    }
+    if (textEl) {
+        textEl.textContent = text;
+    }
 }
 
 // ==========================================================================
@@ -349,7 +353,7 @@ function handleMetricsUpdate(snapshot) {
     const memoryMax = snapshot.totalAvailableMemoryMb || 1000;
     updateMetricCard('memory', snapshot.workingSetMb, 'MB', memoryMax);
     updateMetricCard('threads', snapshot.threadPoolThreads, 'threads', 100);
-    updateMetricCard('queue', snapshot.threadPoolQueueLength, 'pending', 100);
+    updateMetricCard('queue', snapshot.threadPoolSaturationPercent, '%', 100);
 
     // Update total memory display
     const totalMemoryEl = document.getElementById('memoryTotal');
@@ -367,13 +371,22 @@ function handleMetricsUpdate(snapshot) {
     // Update charts
     updateCharts();
     
-    // Update last update time
-    document.getElementById('lastUpdate').textContent = formatUtcTime(timestamp) + ' UTC';
+    // Update last update time (element may not exist in all layouts)
+    const lastUpdateEl = document.getElementById('lastUpdate');
+    if (lastUpdateEl) {
+        lastUpdateEl.textContent = formatUtcTime(timestamp) + ' UTC';
+    }
 }
 
 function updateMetricCard(type, value, unit, maxForBar) {
     const valueEl = document.getElementById(`${type}Value`);
     const barEl = document.getElementById(`${type}Bar`);
+    
+    // Elements may not exist in all layouts
+    if (!valueEl || !barEl) {
+        return;
+    }
+    
     const card = valueEl.closest('.metric-card');
     
     // Format value
@@ -386,14 +399,13 @@ function updateMetricCard(type, value, unit, maxForBar) {
     barEl.style.width = `${barPercent}%`;
     
     // Warning states based on percentage of max
-    card.classList.remove('warning', 'danger');
-    if (type === 'cpu' || type === 'memory') {
-        // Use barPercent for threshold comparison (value as % of max)
-        if (barPercent > 80) card.classList.add('danger');
-        else if (barPercent > 60) card.classList.add('warning');
-    }
-    if (type === 'queue' && value > 10) {
-        card.classList.add('warning');
+    if (card) {
+        card.classList.remove('warning', 'danger');
+        if (type === 'cpu' || type === 'memory' || type === 'queue') {
+            // Use barPercent for threshold comparison (value as % of max)
+            if (barPercent > 80) card.classList.add('danger');
+            else if (barPercent > 60) card.classList.add('warning');
+        }
     }
 }
 
@@ -404,7 +416,7 @@ function addToHistory(timestamp, snapshot) {
     history.cpu.push(snapshot.cpuPercent);
     history.memory.push(snapshot.workingSetMb);
     history.threads.push(snapshot.threadPoolThreads);
-    history.queue.push(snapshot.threadPoolQueueLength);
+    history.queue.push(snapshot.threadPoolSaturationPercent);
     
     // Trim to max data points
     while (history.timestamps.length > CONFIG.maxDataPoints) {
@@ -515,7 +527,7 @@ function initializeCharts() {
                     borderWidth: 1
                 },
                 {
-                    label: 'Queue Length',
+                    label: 'Saturation %',
                     data: [],
                     borderColor: '#ffb900',
                     backgroundColor: 'rgba(255, 185, 0, 0.3)',
@@ -558,7 +570,8 @@ function initializeCharts() {
                     display: true,
                     position: 'right',
                     min: 0,
-                    title: { display: true, text: 'Queue' },
+                    max: 100,
+                    title: { display: true, text: 'Saturation %' },
                     grid: { drawOnChartArea: false }
                 }
             },
@@ -1645,6 +1658,11 @@ function withSimulationId(message, simulationId) {
  */
 function logEvent(levelOrCategory, message, options = {}) {
     const log = document.getElementById('eventLog');
+    if (!log) {
+        console.log(`[${levelOrCategory}] ${message}`);
+        return;
+    }
+    
     const time = getCurrentUtcTime();
     
     // Determine CSS class and icon based on category

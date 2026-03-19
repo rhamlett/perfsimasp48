@@ -189,8 +189,8 @@ namespace PerfProblemSimulator.Services
             if (availableWorker < maxWorker * 0.2)
                 warnings.Add(string.Format("Low available worker threads: {0}/{1}", availableWorker, maxWorker));
 
-            if (snapshot.ThreadPoolQueueLength > 10)
-                warnings.Add(string.Format("Thread pool queue backing up: {0} pending items", snapshot.ThreadPoolQueueLength));
+            if (snapshot.ThreadPoolSaturationPercent > 80)
+                warnings.Add(string.Format("High thread pool saturation: {0:F1}%", snapshot.ThreadPoolSaturationPercent));
 
             return new ApplicationHealthStatus
             {
@@ -212,7 +212,7 @@ namespace PerfProblemSimulator.Services
                 ThreadPool = new ThreadPoolMetrics
                 {
                     ThreadCount = snapshot.ThreadPoolThreads,
-                    PendingWorkItems = snapshot.ThreadPoolQueueLength,
+                    PendingWorkItems = 0, // ThreadPool.PendingWorkItemCount not available in .NET Framework 4.8
                     CompletedWorkItems = 0, // ThreadPool.CompletedWorkItemCount not available in .NET Framework 4.8
                     AvailableWorkerThreads = availableWorker,
                     MaxWorkerThreads = maxWorker,
@@ -293,8 +293,12 @@ namespace PerfProblemSimulator.Services
             int maxWorker, maxIo;
             ThreadPool.GetMaxThreads(out maxWorker, out maxIo);
             var threadPoolThreads = maxWorker - availableWorker;
-            // Note: ThreadPool.PendingWorkItemCount not available in .NET Framework 4.8
-            var queueLength = 0L;
+
+            // Calculate thread pool saturation percentage
+            // Note: ThreadPool.PendingWorkItemCount is not available in .NET Framework 4.8,
+            // so we show saturation % which indicates how close we are to running out of threads
+            var saturationPercent = maxWorker > 0 ? ((double)threadPoolThreads / maxWorker) * 100.0 : 0.0;
+
             // Silence IDE warning about unused out parameters - they're required by the API
             _ = availableIo;
             _ = maxIo;
@@ -310,7 +314,7 @@ namespace PerfProblemSimulator.Services
             GcHeapMb = gcHeapMb,
             TotalAvailableMemoryMb = totalAvailableMemoryMb,
             ThreadPoolThreads = threadPoolThreads,
-            ThreadPoolQueueLength = queueLength,
+            ThreadPoolSaturationPercent = Math.Max(0, Math.Min(100, saturationPercent)),
             ActiveSimulationCount = activeCount,
             ProcessId = _currentProcess.Id
         };
