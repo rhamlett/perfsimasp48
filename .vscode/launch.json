@@ -2,15 +2,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run PerfProblemSimulator (No Debug)",
+            "name": "Run PerfProblemSimulator",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/src/PerfProblemSimulator/bin/Debug/PerfProblemSimulator.exe",
             "args": [],
-            "cwd": "${workspaceFolder}/src/PerfProblemSimulator/bin/Debug",
+            "cwd": "${workspaceFolder}/src/PerfProblemSimulator",
             "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
             "noDebug": true
         }
     ]

@@ -1922,7 +1922,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wire up side panel toggle
     initializeSidePanel();
     
-    logEvent('system', `Dashboard initialized (chart rates: metrics ${CONFIG.metricsChartIntervalMs}ms, latency ${CONFIG.latencyChartIntervalMs}ms)`);
+    logEvent('system', `Dashboard initialized (probe rate: ${CONFIG.latencyProbeIntervalMs}ms, idle timeout: ${CONFIG.idleTimeoutMinutes}m)`);
 });
 
 // ==========================================================================

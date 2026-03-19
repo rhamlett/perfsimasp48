@@ -35,6 +35,22 @@
                 "reveal": "always",
                 "panel": "new"
             }
+        },
+        {
+            "label": "iisexpress",
+            "type": "shell",
+            "command": "& 'C:\\Program Files\\IIS Express\\iisexpress.exe' /path:${workspaceFolder}\\src\\PerfProblemSimulator /port:5000",
+            "dependsOn": "build",
+            "isBackground": true,
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }
