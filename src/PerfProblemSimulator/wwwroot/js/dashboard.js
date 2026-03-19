@@ -263,9 +263,16 @@ function initializeSignalR() {
             updateConnectionStatus('connecting', 'Reconnecting...');
             logEvent('warning', 'Connection lost. Attempting to reconnect...');
         } else if (change.newState === $.signalR.connectionState.connected) {
-            updateConnectionStatus('connected', 'Connected');
+            // Don't set to 'connected' here - let the server's idle state message determine the status
+            // The server sends idle state in OnConnected, which will set the correct status
             if (change.oldState === $.signalR.connectionState.reconnecting) {
                 logEvent('success', 'Reconnected to server');
+                // After reconnect, call WakeUp to wake server and get current idle state
+                try {
+                    $.connection.metricsHub.server.wakeUp();
+                } catch (err) {
+                    console.warn('Failed to invoke WakeUp after reconnect:', err);
+                }
             }
         }
     });
@@ -288,11 +295,13 @@ function initializeSignalR() {
     updateConnectionStatus('connecting', 'Connecting...');
     $.connection.hub.start()
         .done(function () {
-            updateConnectionStatus('connected', 'Connected');
+            // Don't set status here - the server sends idle state in OnConnected
+            // which will trigger handleIdleState to set the correct status
             logEvent('success', 'Connected to metrics hub');
             state.connection = hub;
             
             // Wake up the server on initial page load
+            // This also triggers a response with the current idle state
             try {
                 hub.server.wakeUp();
             } catch (err) {
@@ -799,25 +808,25 @@ function handleLoadTestStats(data) {
 /**
  * Handle idle state change notification from server.
  * When the server goes idle, health probes stop. When it wakes up, they resume.
+ * This also handles initial connection - server always sends current idle state on connect.
  */
 function handleIdleState(data) {
     const wasIdle = state.isIdle;
     state.isIdle = data.isIdle;
     
-    // Log the state change and update connection status
-    if (data.isIdle && !wasIdle) {
-        // Going idle
-        logEvent('idle', data.message || 'Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.');
+    // Always update the connection status indicator based on current idle state
+    if (data.isIdle) {
         updateConnectionStatus('idle', 'Idle');
-    } else if (!data.isIdle && wasIdle) {
-        // Waking up (client knew we were idle)
-        logEvent('system', data.message || 'App waking up from idle state. There may be gaps in diagnostics and logs.');
+        // Only log if transitioning to idle (not on every message)
+        if (!wasIdle) {
+            logEvent('idle', data.message || 'Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.');
+        }
+    } else {
         updateConnectionStatus('connected', 'Connected');
-    } else if (!data.isIdle && !wasIdle && data.message && data.message.toLowerCase().includes('waking up')) {
-        // Server was idle but client didn't know (e.g., after reconnect)
-        // The server's message indicates it just woke up
-        logEvent('system', data.message);
-        updateConnectionStatus('connected', 'Connected');
+        // Log wake-up message if transitioning from idle or message indicates waking
+        if (wasIdle || (data.message && data.message.toLowerCase().includes('waking up'))) {
+            logEvent('system', data.message || 'App waking up from idle state. There may be gaps in diagnostics and logs.');
+        }
     }
 }
 

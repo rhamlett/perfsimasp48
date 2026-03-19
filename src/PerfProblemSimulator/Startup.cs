@@ -122,6 +122,14 @@ namespace PerfProblemSimulator
             // PascalCase property names like "ProtocolVersion", not "protocolVersion".
             // Hub method payloads can use any serialization, but protocol messages cannot.
 
+            // Configure SignalR timeouts to prevent disconnection during idle periods
+            // DisconnectTimeout: How long server waits after connection is lost before firing OnDisconnected
+            // KeepAlive: How often server sends keep-alive to client (must be <= DisconnectTimeout/3)
+            // ConnectionTimeout: How long to wait during initial connection negotiation
+            GlobalHost.Configuration.DisconnectTimeout = TimeSpan.FromHours(2);
+            GlobalHost.Configuration.KeepAlive = TimeSpan.FromMinutes(30);
+            GlobalHost.Configuration.ConnectionTimeout = TimeSpan.FromMinutes(2);
+
             // Configure SignalR
             var hubConfiguration = new HubConfiguration
             {
@@ -138,7 +146,7 @@ namespace PerfProblemSimulator
                 map.RunSignalR(hubConfiguration);
             });
 
-            Logger.Info("SignalR configured at /hubs/metrics");
+            Logger.Info("SignalR configured at /hubs/metrics with extended timeouts (DisconnectTimeout: 2h, KeepAlive: 30m)");
         }
 
         /// <summary>
