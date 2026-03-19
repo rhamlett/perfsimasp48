@@ -25,6 +25,8 @@ namespace PerfProblemSimulator.Services
         private long _periodMaxResponseTimeMs;
         private int _periodPeakConcurrent;
         private long _periodExceptions;
+        private volatile bool _hadActivityThisPeriod;
+        private int _periodNumber;
 
         // Timer is stored to prevent GC from collecting it during the service lifetime
         [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0052:Remove unread private member", Justification = "Timer must be stored to prevent GC collection")]
@@ -74,17 +76,26 @@ namespace PerfProblemSimulator.Services
             try
             {
                 var requestsCompleted = Interlocked.Exchange(ref _periodRequestsCompleted, 0);
+                var hadActivity = _hadActivityThisPeriod;
+                _hadActivityThisPeriod = false;
+                var currentConcurrent = Interlocked.CompareExchange(ref _concurrentRequests, 0, 0);
                 
-                Logger.Info("Load test timer fired - requests in period: {0}, currentConcurrent: {1}",
-                    requestsCompleted, _concurrentRequests);
+                // Only broadcast if there was activity this period OR there are active concurrent requests
+                // This ensures we report stats throughout the entire load test duration
+                var shouldBroadcast = requestsCompleted > 0 || hadActivity || currentConcurrent > 0;
                 
-                if (requestsCompleted == 0) return;
+                if (!shouldBroadcast)
+                {
+                    Logger.Debug("Load test timer fired - no activity, skipping broadcast");
+                    return;
+                }
+                
+                _periodNumber++;
                 
                 var responseTimeSum = Interlocked.Exchange(ref _periodResponseTimeSum, 0);
                 var maxResponseTime = Interlocked.Exchange(ref _periodMaxResponseTimeMs, 0);
                 var peakConcurrent = Interlocked.Exchange(ref _periodPeakConcurrent, 0);
                 var exceptions = Interlocked.Exchange(ref _periodExceptions, 0);
-                var currentConcurrent = Interlocked.CompareExchange(ref _concurrentRequests, 0, 0);
                 
                 var avgResponseTime = requestsCompleted > 0 ? (double)responseTimeSum / requestsCompleted : 0;
                 var requestsPerSecond = (double)requestsCompleted / BroadcastIntervalSeconds;
@@ -101,8 +112,9 @@ namespace PerfProblemSimulator.Services
                     Timestamp = DateTimeOffset.UtcNow
                 };
                 
-                Logger.Info("Broadcasting load test stats: {0} requests, {1}ms avg, {2}ms max, {3} RPS",
-                    requestsCompleted, avgResponseTime, maxResponseTime, requestsPerSecond);
+                var errorRate = requestsCompleted > 0 ? (double)exceptions / requestsCompleted * 100 : 0;
+                Logger.Info("Load test period #{0}: {1} requests, {2:F1}ms avg, {3}ms max, {4:F2} RPS, {5:F1}% errors, {6} concurrent",
+                    _periodNumber, requestsCompleted, avgResponseTime, maxResponseTime, requestsPerSecond, errorRate, currentConcurrent);
                 
                 var hubContext = GlobalHost.ConnectionManager.GetHubContext<MetricsHub>();
                 hubContext.Clients.All.receiveLoadTestStats(statsData);
@@ -118,6 +130,7 @@ namespace PerfProblemSimulator.Services
             var currentConcurrent = Interlocked.Increment(ref _concurrentRequests);
             UpdatePeakConcurrent(currentConcurrent);
             _idleStateService.RecordActivity();
+            _hadActivityThisPeriod = true;
             
             var stopwatch = Stopwatch.StartNew();
             var totalCpuWorkDone = 0;
