@@ -32,6 +32,7 @@ namespace PerfProblemSimulator.Services
         private CancellationTokenSource _cts;
         private bool _disposed;
         private string _baseUrl;
+        private volatile bool _forceUrlRecheck;
 
         /// <summary>
         /// Request timeout in milliseconds.
@@ -51,9 +52,22 @@ namespace PerfProblemSimulator.Services
             _simulationTracker = simulationTracker;
             _idleStateService = idleStateService;
 
+            // Subscribe to wake-up events to force immediate URL recheck
+            _idleStateService.WakingUp += OnWakingUp;
+
             // Apply safety limit: minimum 100ms (10 probes/sec max)
             var configuredInterval = ConfigurationHelper.LatencyProbeIntervalMs;
             _probeIntervalMs = Math.Max(100, configuredInterval);
+        }
+
+        /// <summary>
+        /// Called when the application wakes up from idle state.
+        /// Forces an immediate URL recheck on the next probe cycle.
+        /// </summary>
+        private void OnWakingUp(object sender, EventArgs e)
+        {
+            _forceUrlRecheck = true;
+            Logger.Debug("Waking from idle - will recheck probe URL on next cycle");
         }
 
         /// <summary>
@@ -129,9 +143,13 @@ namespace PerfProblemSimulator.Services
                             continue;
                         }
 
-                        // Resolve URL on first run, or periodically recheck if on localhost
+                        // Resolve URL on first run, when waking from idle, or periodically if on localhost
                         var now = DateTime.UtcNow;
+                        var forceRecheck = _forceUrlRecheck;
+                        if (forceRecheck) _forceUrlRecheck = false;
+                        
                         var shouldRecheckUrl = currentBaseUrl == null 
+                            || forceRecheck
                             || (IsLocalhostUrl(currentBaseUrl) && (now - lastUrlCheck).TotalSeconds >= UrlRecheckSeconds);
 
                         if (shouldRecheckUrl)
@@ -341,6 +359,9 @@ namespace PerfProblemSimulator.Services
         {
             if (_disposed) return;
             _disposed = true;
+
+            // Unsubscribe from events
+            _idleStateService.WakingUp -= OnWakingUp;
 
             Stop();
             if (_cts != null)
