@@ -76,7 +76,7 @@ namespace PerfProblemSimulator.App_Start
                     return Math.Max(100, result); // Minimum 100ms safety limit
                 }
 
-                return 100; // Default
+                return 200; // Default
             }
         }
 
