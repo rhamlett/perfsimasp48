@@ -369,6 +369,10 @@
                 <span class="nav-icon">☁️</span>
                 <span class="nav-label">Azure Diagnostics<span class="nav-desc">Diagnose issues in App Service</span></span>
             </a>
+            <a href="/azure-load-testing.html" class="sidebar-nav-item">
+                <span class="nav-icon">📈</span>
+                <span class="nav-label">Azure Load Testing<span class="nav-desc">Load test endpoint & parameters</span></span>
+            </a>
             <a href="/azure-deployment.html" class="sidebar-nav-item active">
                 <span class="nav-icon">🚀</span>
                 <span class="nav-label">Deploy to Azure<span class="nav-desc">GitHub Actions + OIDC setup</span></span>
@@ -1017,12 +1021,14 @@ echo "AZURE_SUBSCRIPTION_ID=$SUB_ID"</code></pre>
         // Fetch and display SKU
         async function fetchAzureSku() {
             try {
-                const response = await fetch('/api/metrics');
-                const data = await response.json();
-                const skuElement = document.getElementById('skuDisplay');
-                if (skuElement && data.processInfo && data.processInfo.azureSku) {
-                    skuElement.textContent = `SKU: ${data.processInfo.azureSku}`;
-                    skuElement.style.display = 'block';
+                const response = await fetch('/api/admin/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    const skuElement = document.getElementById('skuDisplay');
+                    if (skuElement && data.processInfo && data.processInfo.azureSku) {
+                        skuElement.textContent = `SKU: ${data.processInfo.azureSku}`;
+                        skuElement.style.display = 'block';
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch Azure SKU', error);

@@ -292,8 +292,8 @@ function initializeSignalR() {
     });
 
     $.connection.hub.error(function (error) {
+        // Suppress SignalR errors from event log - they are mostly idle timeout related and redundant
         console.error('SignalR error:', error);
-        logEvent('warning', 'SignalR error: ' + (error.message || error));
     });
 
     // Note: Hub URL is set by the auto-generated proxy script at /hubs/metrics/signalr/hubs
