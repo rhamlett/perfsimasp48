@@ -91,6 +91,7 @@ namespace PerfProblemSimulator.Services
 public class CpuStressService : ICpuStressService
     {
         private readonly ISimulationTracker _simulationTracker;
+        private readonly ISimulationTelemetry _telemetry;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         /// <summary>
@@ -102,10 +103,12 @@ public class CpuStressService : ICpuStressService
         /// Initializes a new instance of the <see cref="CpuStressService"/> class.
         /// </summary>
         /// <param name="simulationTracker">Service for tracking active simulations.</param>
-        public CpuStressService(ISimulationTracker simulationTracker)
+        /// <param name="telemetry">Service for tracking simulation events to Application Insights.</param>
+        public CpuStressService(ISimulationTracker simulationTracker, ISimulationTelemetry telemetry)
         {
             if (simulationTracker == null) throw new ArgumentNullException(nameof(simulationTracker));
             _simulationTracker = simulationTracker;
+            _telemetry = telemetry;
         }
 
     /// <inheritdoc />
@@ -155,6 +158,9 @@ public class CpuStressService : ICpuStressService
 
         // Register this simulation with the tracker
         _simulationTracker.RegisterSimulation(simulationId, SimulationType.Cpu, parameters, cts);
+
+        // Track simulation start in Application Insights (if configured)
+        _telemetry?.TrackSimulationStarted(simulationId, SimulationType.Cpu, parameters);
 
         Logger.Info(
             "Starting CPU stress simulation {0}: {1}s @ {2} across {3} cores",
@@ -308,18 +314,27 @@ public class CpuStressService : ICpuStressService
                 "CPU stress simulation {0} completed normally after {1}s",
                 simulationId,
                 durationSeconds);
+            
+            // Track simulation end in Application Insights
+            _telemetry?.TrackSimulationEnded(simulationId, SimulationType.Cpu, "Completed");
         }
         catch (OperationCanceledException)
         {
             Logger.Info(
                 "CPU stress simulation {0} was cancelled",
                 simulationId);
+            
+            // Track simulation cancellation in Application Insights
+            _telemetry?.TrackSimulationEnded(simulationId, SimulationType.Cpu, "Cancelled");
         }
         catch (Exception ex)
         {
             Logger.Error(ex,
                 "CPU stress simulation {0} failed with error",
                 simulationId);
+            
+            // Track simulation failure in Application Insights
+            _telemetry?.TrackSimulationEnded(simulationId, SimulationType.Cpu, "Failed");
         }
         finally
         {

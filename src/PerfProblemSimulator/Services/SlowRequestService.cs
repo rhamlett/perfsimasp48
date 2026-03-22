@@ -19,6 +19,7 @@ namespace PerfProblemSimulator.Services
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly ISimulationTracker _simulationTracker;
+        private readonly ISimulationTelemetry _telemetry;
         private readonly Random _random = new Random();
 
         private CancellationTokenSource _cts;
@@ -38,10 +39,11 @@ namespace PerfProblemSimulator.Services
 
         public bool IsRunning => _isRunning;
 
-        public SlowRequestService(ISimulationTracker simulationTracker)
+        public SlowRequestService(ISimulationTracker simulationTracker, ISimulationTelemetry telemetry)
         {
             if (simulationTracker == null) throw new ArgumentNullException("simulationTracker");
             _simulationTracker = simulationTracker;
+            _telemetry = telemetry;
         }
 
         public SimulationResult Start(SlowRequestRequest request)
@@ -84,6 +86,9 @@ namespace PerfProblemSimulator.Services
 
             _simulationTracker.RegisterSimulation(_simulationId, SimulationType.SlowRequest, parameters, _cts);
 
+            // Track simulation start in Application Insights (if configured)
+            _telemetry?.TrackSimulationStarted(_simulationId, SimulationType.SlowRequest, parameters);
+
             _requestSpawnerThread = new Thread(() => SpawnRequestsLoop(request.MaxRequests, _cts.Token))
             {
                 Name = string.Format("SlowRequestSpawner-{0:N}", _simulationId),
@@ -122,6 +127,9 @@ namespace PerfProblemSimulator.Services
             if (_cts != null) _cts.Cancel();
             _isRunning = false;
             _simulationTracker.UnregisterSimulation(_simulationId);
+
+            // Track simulation end in Application Insights (if configured)
+            _telemetry?.TrackSimulationEnded(_simulationId, SimulationType.SlowRequest, "Stopped");
 
             Logger.Info("Slow request simulation stopped: {0}. Sent={1}, Completed={2}, InProgress={3}",
                 _simulationId, _requestsSent, _requestsCompleted, _requestsInProgress);
@@ -305,6 +313,10 @@ namespace PerfProblemSimulator.Services
                     {
                         _isRunning = false;
                         _simulationTracker.UnregisterSimulation(_simulationId);
+                        
+                        // Track simulation completion in Application Insights (if configured)
+                        _telemetry?.TrackSimulationEnded(_simulationId, SimulationType.SlowRequest, "Completed");
+                        
                         Logger.Info("Slow request simulation completed naturally: {0}. Total requests: {1}, Completed: {2}",
                             _simulationId, _requestsSent, _requestsCompleted);
                     }

@@ -225,6 +225,47 @@
             margin-bottom: 0;
         }
 
+        .warning-box {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15) 0%, rgba(255, 193, 7, 0.05) 100%);
+            border-left: 4px solid var(--color-warning);
+            padding: 1rem 1.5rem;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            margin: 1.5rem 0;
+        }
+
+        .warning-box p {
+            margin-bottom: 0.5rem;
+        }
+
+        .warning-box p:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.875rem;
+        }
+
+        .info-table th, .info-table td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border: 1px solid var(--color-bg);
+        }
+
+        .info-table th {
+            background: var(--color-bg);
+            font-weight: 600;
+        }
+
+        .info-table code {
+            background: rgba(0,0,0,0.05);
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+        }
+
         .latency-table {
             width: 100%;
             border-collapse: collapse;
@@ -532,18 +573,57 @@
 
             <h3>Correlation Queries</h3>
             <p>Use these KQL queries in Log Analytics to correlate dashboard events with server telemetry:</p>
-            <div class="code-block">
-<span class="comment">// Find all traces for a specific simulation</span>
-traces
-| <span class="keyword">where</span> message <span class="keyword">contains</span> <span class="string">"YOUR-SIMULATION-ID-HERE"</span>
-| <span class="keyword">order by</span> timestamp <span class="keyword">asc</span>
+            
+            <div class="warning-box">
+                <p><strong>⚠️ Table Name Differences:</strong> Log Analytics workspaces use different table and column names than classic Application Insights. If you see errors like "The name 'traces' does not refer to any known table", use the Log Analytics names below:</p>
+                <table class="info-table">
+                    <tr><th>Classic App Insights</th><th>Log Analytics</th></tr>
+                    <tr><td>traces</td><td>AppTraces</td></tr>
+                    <tr><td>customEvents</td><td>AppEvents</td></tr>
+                    <tr><td>requests</td><td>AppRequests</td></tr>
+                    <tr><td>exceptions</td><td>AppExceptions</td></tr>
+                    <tr><td>dependencies</td><td>AppDependencies</td></tr>
+                    <tr><td>message</td><td>Message</td></tr>
+                    <tr><td>timestamp</td><td>TimeGenerated</td></tr>
+                    <tr><td>customDimensions</td><td>Properties</td></tr>
+                </table>
             </div>
 
             <div class="code-block">
-<span class="comment">// Find custom events for a simulation</span>
-customEvents
-| <span class="keyword">where</span> customDimensions[<span class="string">"SimulationId"</span>] == <span class="string">"YOUR-SIMULATION-ID-HERE"</span>
-| <span class="keyword">order by</span> timestamp <span class="keyword">asc</span>
+<span class="comment">// Find simulation start/end events by Simulation ID</span>
+AppEvents
+| <span class="keyword">where</span> Name <span class="keyword">in</span> (<span class="string">"SimulationStarted"</span>, <span class="string">"SimulationEnded"</span>)
+| <span class="keyword">where</span> Properties[<span class="string">"SimulationId"</span>] == <span class="string">"YOUR-SIMULATION-ID-HERE"</span>
+| <span class="keyword">project</span> TimeGenerated, Name, Properties
+| <span class="keyword">order by</span> TimeGenerated <span class="keyword">asc</span>
+            </div>
+
+            <div class="code-block">
+<span class="comment">// Find all requests during a simulation time window</span>
+<span class="keyword">let</span> simStart = <span class="keyword">toscalar</span>(
+    AppEvents 
+    | <span class="keyword">where</span> Name == <span class="string">"SimulationStarted"</span> <span class="keyword">and</span> Properties[<span class="string">"SimulationId"</span>] == <span class="string">"YOUR-SIMULATION-ID-HERE"</span>
+    | <span class="keyword">project</span> TimeGenerated);
+<span class="keyword">let</span> simEnd = <span class="keyword">toscalar</span>(
+    AppEvents 
+    | <span class="keyword">where</span> Name == <span class="string">"SimulationEnded"</span> <span class="keyword">and</span> Properties[<span class="string">"SimulationId"</span>] == <span class="string">"YOUR-SIMULATION-ID-HERE"</span>
+    | <span class="keyword">project</span> TimeGenerated);
+AppRequests
+| <span class="keyword">where</span> TimeGenerated <span class="keyword">between</span> (simStart .. simEnd)
+| <span class="keyword">order by</span> TimeGenerated <span class="keyword">asc</span>
+            </div>
+
+            <div class="code-block">
+<span class="comment">// Find failed requests during a simulation</span>
+<span class="keyword">let</span> simId = <span class="string">"YOUR-SIMULATION-ID-HERE"</span>;
+<span class="keyword">let</span> simEvents = AppEvents | <span class="keyword">where</span> Properties[<span class="string">"SimulationId"</span>] == simId;
+<span class="keyword">let</span> simStart = <span class="keyword">toscalar</span>(simEvents | <span class="keyword">where</span> Name == <span class="string">"SimulationStarted"</span> | <span class="keyword">project</span> TimeGenerated);
+<span class="keyword">let</span> simEnd = <span class="keyword">toscalar</span>(simEvents | <span class="keyword">where</span> Name == <span class="string">"SimulationEnded"</span> | <span class="keyword">project</span> TimeGenerated);
+AppRequests
+| <span class="keyword">where</span> TimeGenerated <span class="keyword">between</span> (simStart .. simEnd)
+| <span class="keyword">where</span> Success == <span class="keyword">false</span>
+| <span class="keyword">project</span> TimeGenerated, Name, ResultCode, DurationMs, Url
+| <span class="keyword">order by</span> TimeGenerated <span class="keyword">asc</span>
             </div>
 
             <h3>Troubleshooting Workflow</h3>

@@ -14,15 +14,17 @@ namespace PerfProblemSimulator.Services
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly ISimulationTracker _simulationTracker;
+        private readonly ISimulationTelemetry _telemetry;
         private readonly List<AllocatedMemoryBlock> _allocatedBlocks = new List<AllocatedMemoryBlock>();
         private readonly object _lock = new object();
         private const int DefaultSizeMegabytes = 100;
         private const int MinimumSizeMegabytes = 10;
 
-        public MemoryPressureService(ISimulationTracker simulationTracker)
+        public MemoryPressureService(ISimulationTracker simulationTracker, ISimulationTelemetry telemetry)
         {
             if (simulationTracker == null) throw new ArgumentNullException("simulationTracker");
             _simulationTracker = simulationTracker;
+            _telemetry = telemetry;
         }
 
         public SimulationResult AllocateMemory(int sizeMegabytes)
@@ -83,6 +85,9 @@ namespace PerfProblemSimulator.Services
             var cts = new CancellationTokenSource();
             _simulationTracker.RegisterSimulation(simulationId, SimulationType.Memory, parameters, cts);
 
+            // Track simulation start in Application Insights (if configured)
+            _telemetry?.TrackSimulationStarted(simulationId, SimulationType.Memory, parameters);
+
             Logger.Info("Allocated {0} MB (block {1}). Total allocated: {2} MB", actualSize, simulationId, GetTotalAllocatedMegabytes());
 
             return new SimulationResult
@@ -106,7 +111,12 @@ namespace PerfProblemSimulator.Services
             {
                 releasedCount = _allocatedBlocks.Count;
                 releasedBytes = _allocatedBlocks.Sum(b => b.SizeBytes);
-                foreach (var block in _allocatedBlocks) _simulationTracker.UnregisterSimulation(block.Id);
+                foreach (var block in _allocatedBlocks)
+                {
+                    _simulationTracker.UnregisterSimulation(block.Id);
+                    // Track simulation end in Application Insights for each released block
+                    _telemetry?.TrackSimulationEnded(block.Id, SimulationType.Memory, "Released");
+                }
                 _allocatedBlocks.Clear();
             }
 

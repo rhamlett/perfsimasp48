@@ -64,6 +64,11 @@ namespace PerfProblemSimulator.App_Start
             // Singleton Services (one instance for app lifetime)
             // -----------------------------------------------------------------------------
 
+            // SimulationTelemetry - Tracks simulation events to Application Insights
+            // Auto-configures from APPLICATIONINSIGHTS_CONNECTION_STRING if available
+            container.RegisterType<ISimulationTelemetry, SimulationTelemetry>(
+                new ContainerControlledLifetimeManager());
+
             // IdleStateService - Manages application idle state
             container.RegisterType<IIdleStateService, IdleStateService>(
                 new ContainerControlledLifetimeManager());

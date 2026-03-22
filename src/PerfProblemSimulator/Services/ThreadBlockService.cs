@@ -13,14 +13,16 @@ namespace PerfProblemSimulator.Services
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private readonly ISimulationTracker _simulationTracker;
+        private readonly ISimulationTelemetry _telemetry;
         private const int DefaultDelayMs = 1000;
         private const int DefaultConcurrentRequests = 10;
         private const int MinimumDelayMs = 100;
 
-        public ThreadBlockService(ISimulationTracker simulationTracker)
+        public ThreadBlockService(ISimulationTracker simulationTracker, ISimulationTelemetry telemetry)
         {
             if (simulationTracker == null) throw new ArgumentNullException("simulationTracker");
             _simulationTracker = simulationTracker;
+            _telemetry = telemetry;
         }
 
         public Task<SimulationResult> TriggerSyncOverAsyncAsync(int delayMilliseconds, int concurrentRequests, CancellationToken cancellationToken)
@@ -55,6 +57,9 @@ namespace PerfProblemSimulator.Services
             };
 
             _simulationTracker.RegisterSimulation(simulationId, SimulationType.ThreadBlock, parameters, cts);
+
+            // Track simulation start in Application Insights (if configured)
+            _telemetry?.TrackSimulationStarted(simulationId, SimulationType.ThreadBlock, parameters);
 
             Logger.Warn("Starting sync-over-async simulation {0}: {1} concurrent requests, each blocking for {2}ms. Thread pool has {3}/{4} workers available.",
                 simulationId, actualConcurrent, actualDelay, workerThreads, maxWorker);
@@ -114,13 +119,16 @@ namespace PerfProblemSimulator.Services
                 catch (OperationCanceledException)
                 {
                     Logger.Info("Simulation {0} was cancelled", simulationId);
+                    _telemetry?.TrackSimulationEnded(simulationId, SimulationType.ThreadBlock, "Cancelled");
                 }
 
                 Logger.Info("Simulation {0}: All {1} blocking operations completed", simulationId, concurrentRequests);
+                _telemetry?.TrackSimulationEnded(simulationId, SimulationType.ThreadBlock, "Completed");
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Simulation {0} failed with error", simulationId);
+                _telemetry?.TrackSimulationEnded(simulationId, SimulationType.ThreadBlock, "Failed");
             }
             finally
             {

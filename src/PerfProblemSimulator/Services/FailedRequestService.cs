@@ -53,6 +53,7 @@ public class FailedRequestService : IFailedRequestService, IDisposable
         private static readonly HttpClient HttpClientInstance = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
         private readonly ISimulationTracker _simulationTracker;
+        private readonly ISimulationTelemetry _telemetry;
 
         private CancellationTokenSource _cts;
         private Thread _requestSpawnerThread;
@@ -67,10 +68,11 @@ public class FailedRequestService : IFailedRequestService, IDisposable
 
         public bool IsRunning => _isRunning;
 
-        public FailedRequestService(ISimulationTracker simulationTracker)
+        public FailedRequestService(ISimulationTracker simulationTracker, ISimulationTelemetry telemetry)
         {
             if (simulationTracker == null) throw new ArgumentNullException(nameof(simulationTracker));
             _simulationTracker = simulationTracker;
+            _telemetry = telemetry;
         }
 
         public SimulationResult Start(int requestCount)
@@ -108,6 +110,9 @@ public class FailedRequestService : IFailedRequestService, IDisposable
             };
 
             _simulationTracker.RegisterSimulation(_simulationId, SimulationType.FailedRequest, parameters, _cts);
+
+            // Track simulation start in Application Insights (if configured)
+            _telemetry?.TrackSimulationStarted(_simulationId, SimulationType.FailedRequest, parameters);
 
             // Use dedicated thread (not thread pool) to spawn requests
             _requestSpawnerThread = new Thread(() => SpawnFailedRequestsLoop(_cts.Token))
@@ -150,6 +155,9 @@ public class FailedRequestService : IFailedRequestService, IDisposable
         if (_cts != null) _cts.Cancel();
             _isRunning = false;
             _simulationTracker.UnregisterSimulation(_simulationId);
+
+            // Track simulation end in Application Insights (if configured)
+            _telemetry?.TrackSimulationEnded(_simulationId, SimulationType.FailedRequest, "Stopped");
 
             Logger.Info(
                 "Failed request simulation stopped: {0}. Sent={1}, Completed={2}, InProgress={3}",
@@ -247,6 +255,9 @@ public class FailedRequestService : IFailedRequestService, IDisposable
             {
                 _isRunning = false;
                 _simulationTracker.UnregisterSimulation(_simulationId);
+
+                // Track simulation completion in Application Insights (if configured)
+                _telemetry?.TrackSimulationEnded(_simulationId, SimulationType.FailedRequest, "Completed");
 
                 Logger.Info(
                     "Failed request simulation {0} completed. Generated {1} HTTP 500 errors.",

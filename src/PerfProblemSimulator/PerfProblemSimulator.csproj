@@ -79,6 +79,9 @@
     
     <!-- DiagnosticSource for Activity-based telemetry correlation with Application Insights -->
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.1" />
+    
+    <!-- Application Insights for custom event tracking (auto-configures from APPLICATIONINSIGHTS_CONNECTION_STRING) -->
+    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
   </ItemGroup>
 
   <!-- Framework References -->
