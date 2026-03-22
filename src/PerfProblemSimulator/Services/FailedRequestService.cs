@@ -86,7 +86,11 @@ public class FailedRequestService : IFailedRequestService, IDisposable
                 };
             }
 
-            _simulationId = Guid.NewGuid();
+                        _simulationId = Guid.NewGuid();
+            
+            // Set Activity tag for Application Insights correlation (if enabled via Azure portal)
+            Activity.Current?.SetTag("SimulationId", _simulationId.ToString());
+            
             _cts = new CancellationTokenSource();
             _requestsSent = 0;
             _requestsCompleted = 0;

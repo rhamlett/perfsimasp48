@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -28,6 +29,10 @@ namespace PerfProblemSimulator.Services
             var actualConcurrent = concurrentRequests <= 0 ? DefaultConcurrentRequests : concurrentRequests;
 
             var simulationId = Guid.NewGuid();
+            
+            // Set Activity tag for Application Insights correlation (if enabled via Azure portal)
+            Activity.Current?.SetTag("SimulationId", simulationId.ToString());
+            
             var startedAt = DateTimeOffset.UtcNow;
             var estimatedEndAt = startedAt.AddMilliseconds(actualDelay);
 

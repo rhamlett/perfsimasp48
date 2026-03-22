@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -34,6 +35,10 @@ namespace PerfProblemSimulator.Services
             Logger.Info("Allocating {0} MB. Current total: {1} MB", actualSize, currentAllocatedBytes / (1024.0 * 1024.0));
 
             var simulationId = Guid.NewGuid();
+            
+            // Set Activity tag for Application Insights correlation (if enabled via Azure portal)
+            Activity.Current?.SetTag("SimulationId", simulationId.ToString());
+            
             var startedAt = DateTimeOffset.UtcNow;
             var sizeBytes = (long)actualSize * 1024 * 1024;
 

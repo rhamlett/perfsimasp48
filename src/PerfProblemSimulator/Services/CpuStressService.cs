@@ -131,6 +131,10 @@ public class CpuStressService : ICpuStressService
             }
 
         var simulationId = Guid.NewGuid();
+        
+        // Set Activity tag for Application Insights correlation (if enabled via Azure portal)
+        Activity.Current?.SetTag("SimulationId", simulationId.ToString());
+        
         var startedAt = DateTimeOffset.UtcNow;
         var estimatedEndAt = startedAt.AddSeconds(actualDuration);
         var processorCount = Environment.ProcessorCount;

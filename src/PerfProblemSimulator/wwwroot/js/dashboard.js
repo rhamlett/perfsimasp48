@@ -1355,8 +1355,6 @@ async function startSlowRequests() {
     const stopBtn = document.getElementById('btnStopSlowRequests');
     
     try {
-        logEvent('slowrequest', `Starting slow request simulator: ${durationSeconds}s requests, ${intervalSeconds}s interval, max ${maxRequests}`);
-        
         startBtn.disabled = true;
         stopBtn.disabled = false;
         
@@ -1372,7 +1370,8 @@ async function startSlowRequests() {
         
         if (response.ok) {
             const result = await response.json();
-            // Note: Don't log result.message - "Starting slow request simulator" already logged above
+            addActiveSimulation(result.simulationId, 'slowrequest', 'Slow Requests');
+            logEvent('slowrequest', withSimulationId(`Slow request simulation started`, result.simulationId));
             statusDiv.textContent = `Running: ${durationSeconds}s requests every ${intervalSeconds}s (max ${maxRequests})`;
             statusDiv.classList.add('active');
             
@@ -1751,12 +1750,43 @@ function withSimulationId(message, simulationId) {
 
 /**
  * Copies a simulation ID to the clipboard and shows visual feedback.
+ * Uses navigator.clipboard API with fallback to execCommand for HTTP sites.
  * @param {HTMLElement} element - The element that was clicked
  * @param {string} simulationId - The simulation ID to copy
  */
 async function copySimulationId(element, simulationId) {
-    try {
-        await navigator.clipboard.writeText(simulationId);
+    let success = false;
+    
+    // Try modern clipboard API first (requires HTTPS or localhost)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+            await navigator.clipboard.writeText(simulationId);
+            success = true;
+        } catch (err) {
+            console.warn('Clipboard API failed, trying fallback:', err);
+        }
+    }
+    
+    // Fallback for HTTP sites or older browsers
+    if (!success) {
+        try {
+            const textArea = document.createElement('textarea');
+            textArea.value = simulationId;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            success = document.execCommand('copy');
+            document.body.removeChild(textArea);
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+        }
+    }
+    
+    // Show visual feedback
+    if (success) {
         element.classList.add('copied');
         const originalTitle = element.getAttribute('title');
         element.setAttribute('title', 'Copied!');
@@ -1764,8 +1794,15 @@ async function copySimulationId(element, simulationId) {
             element.classList.remove('copied');
             element.setAttribute('title', originalTitle);
         }, 1500);
-    } catch (err) {
-        console.error('Failed to copy simulation ID:', err);
+    } else {
+        // Show error feedback
+        element.classList.add('copy-failed');
+        const originalTitle = element.getAttribute('title');
+        element.setAttribute('title', 'Copy failed - try selecting manually');
+        setTimeout(() => {
+            element.classList.remove('copy-failed');
+            element.setAttribute('title', originalTitle);
+        }, 2000);
     }
 }
 
