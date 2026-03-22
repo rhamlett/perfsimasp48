@@ -1739,13 +1739,34 @@ const LOG_ICONS = {
 
 /**
  * Wraps a message with a simulation ID tooltip for correlation.
+ * Click on the message to copy the simulation ID to clipboard.
  * @param {string} message - The message to display
  * @param {string} simulationId - The full GUID simulation ID (shown in tooltip)
  * @returns {string} HTML string with message and tooltip
  */
 function withSimulationId(message, simulationId) {
     if (!simulationId) return message;
-    return `<span class="sim-msg" title="Simulation ID: ${simulationId}">${message}</span>`;
+    return `<span class="sim-msg" data-simulation-id="${simulationId}" title="Click to copy Simulation ID: ${simulationId}">${message}</span>`;
+}
+
+/**
+ * Copies a simulation ID to the clipboard and shows visual feedback.
+ * @param {HTMLElement} element - The element that was clicked
+ * @param {string} simulationId - The simulation ID to copy
+ */
+async function copySimulationId(element, simulationId) {
+    try {
+        await navigator.clipboard.writeText(simulationId);
+        element.classList.add('copied');
+        const originalTitle = element.getAttribute('title');
+        element.setAttribute('title', 'Copied!');
+        setTimeout(() => {
+            element.classList.remove('copied');
+            element.setAttribute('title', originalTitle);
+        }, 1500);
+    } catch (err) {
+        console.error('Failed to copy simulation ID:', err);
+    }
 }
 
 /**
@@ -1910,6 +1931,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnStopSlowRequests').addEventListener('click', stopSlowRequests);
     document.getElementById('btnStartFailedRequests').addEventListener('click', startFailedRequests);
     document.getElementById('btnCopyEventLog').addEventListener('click', copyEventLog);
+    
+    // Enable click-to-copy for simulation IDs in event log (delegated handler)
+    document.getElementById('eventLog').addEventListener('click', function(e) {
+        const simMsg = e.target.closest('.sim-msg');
+        if (simMsg && simMsg.dataset.simulationId) {
+            copySimulationId(simMsg, simMsg.dataset.simulationId);
+        }
+    });
     
     // Initialize slow request Stop button as disabled
     document.getElementById('btnStopSlowRequests').disabled = true;
