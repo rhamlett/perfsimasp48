@@ -254,6 +254,7 @@ function initializeSignalR() {
     hub.client.receiveSlowRequestLatency = handleSlowRequestLatency;
     hub.client.receiveLoadTestStats = handleLoadTestStats;
     hub.client.receiveIdleState = handleIdleState;
+    hub.client.receiveEventLogMessage = handleEventLogMessage;
 
     // Configure connection
     $.connection.hub.logging = true;
@@ -940,6 +941,22 @@ function handleIdleState(data) {
             logEvent('system', data.message || 'App waking up from idle state. There may be gaps in diagnostics and logs.');
         }
     }
+}
+
+/**
+ * Handle event log message from server.
+ * Displays a server-pushed message in the UI event log panel.
+ */
+function handleEventLogMessage(data) {
+    const level = data.level || 'info';
+    const message = data.message || '';
+    const options = {};
+    
+    if (data.icon) {
+        options.icon = data.icon;
+    }
+    
+    logEvent(level, message, options);
 }
 
 /**

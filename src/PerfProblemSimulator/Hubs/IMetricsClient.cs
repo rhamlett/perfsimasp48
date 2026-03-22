@@ -58,6 +58,38 @@ namespace PerfProblemSimulator.Hubs
         /// Notifies client that the application is going idle.
         /// </summary>
         Task ReceiveIdleState(IdleStateData data);
+
+        /// <summary>
+        /// Receives a message to display in the event log panel.
+        /// </summary>
+        Task ReceiveEventLogMessage(EventLogMessageData data);
+    }
+
+    /// <summary>
+    /// Data for a message to display in the client's event log panel.
+    /// </summary>
+    [JsonObject(NamingStrategyType = typeof(CamelCaseNamingStrategy))]
+    public class EventLogMessageData
+    {
+        /// <summary>
+        /// Log level or category (e.g., "info", "warning", "error", "success", "system").
+        /// </summary>
+        public string Level { get; set; } = "info";
+
+        /// <summary>
+        /// The message to display in the event log.
+        /// </summary>
+        public string Message { get; set; } = "";
+
+        /// <summary>
+        /// Optional icon override for the event log entry.
+        /// </summary>
+        public string Icon { get; set; } = "";
+
+        /// <summary>
+        /// When this message was generated.
+        /// </summary>
+        public DateTimeOffset Timestamp { get; set; }
     }
 
     /// <summary>
