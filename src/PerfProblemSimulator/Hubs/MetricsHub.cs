@@ -87,16 +87,6 @@ namespace PerfProblemSimulator.Hubs
             };
             Clients.Caller.receiveIdleState(idleData);
 
-            // Send license disclaimer on initial connection
-            var disclaimerData = new EventLogMessageData
-            {
-                Level = "warning",
-                Message = "⚖️ This software is provided \"AS IS\" without warranty. The author shall not be liable for any damages arising from use or misuse. Deploy only in isolated, non-production environments. Licensed under MIT License.",
-                Icon = "",
-                Timestamp = DateTimeOffset.UtcNow
-            };
-            Clients.Caller.receiveEventLogMessage(disclaimerData);
-
             return base.OnConnected();
         }
 

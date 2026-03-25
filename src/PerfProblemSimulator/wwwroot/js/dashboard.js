@@ -2001,6 +2001,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeSidePanel();
     
     logEvent('system', `Dashboard initialized (probe rate: ${CONFIG.latencyProbeIntervalMs}ms, idle timeout: ${CONFIG.idleTimeoutMinutes}m)`);
+
+    // Static license disclaimers (Line 2 first so Line 1 appears on top)
+    logEvent('warning', '⚖️ Deploy only in isolated, non-production environments. Licensed under MIT License.');
+    logEvent('warning', '⚖️ This software is provided "AS IS" without warranty. The author shall not be liable for any damages arising from use or misuse.');
 });
 
 // ==========================================================================
