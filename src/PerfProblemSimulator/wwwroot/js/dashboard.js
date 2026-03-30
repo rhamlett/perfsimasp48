@@ -276,11 +276,9 @@ function initializeSignalR() {
             // The server sends idle state in OnConnected, which will set the correct status
             if (change.oldState === $.signalR.connectionState.reconnecting) {
                 logEvent('success', 'Reconnected to server');
-                // After reconnect, call WakeUp to wake server and get current idle state
-                $.connection.metricsHub.server.wakeUp()
-                    .fail(function(err) {
-                        console.error('WakeUp after reconnect failed:', err);
-                    });
+                // NOTE: Do NOT call wakeUp() here. Auto-reconnects are framework-level and
+                // should not wake the app from idle. The server sends current idle state
+                // from OnReconnected, which will update the UI via handleIdleState.
             }
         }
     });

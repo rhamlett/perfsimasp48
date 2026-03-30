@@ -91,6 +91,33 @@ namespace PerfProblemSimulator.Hubs
         }
 
         /// <summary>
+        /// Called when a client reconnects to the hub after a temporary disconnect.
+        /// </summary>
+        /// <remarks>
+        /// SignalR 2.x calls OnReconnected (not OnConnected) when a client auto-reconnects.
+        /// We must NOT wake from idle here — auto-reconnects are framework-level and do not
+        /// represent intentional user activity. We send the current idle state so the client
+        /// UI stays in sync.
+        /// </remarks>
+        public override Task OnReconnected()
+        {
+            Logger.Info("Dashboard client reconnected: {0}", Context.ConnectionId);
+
+            // Send current idle state — do NOT call WakeUp or RecordActivity
+            var idleData = new IdleStateData
+            {
+                IsIdle = _idleStateService.IsIdle,
+                Message = _idleStateService.IsIdle
+                    ? "Application is idle, no health probes being sent. There will be gaps in diagnostics and logs."
+                    : "Application is active",
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            Clients.Caller.receiveIdleState(idleData);
+
+            return base.OnReconnected();
+        }
+
+        /// <summary>
         /// Called when a client disconnects from the hub.
         /// </summary>
         public override Task OnDisconnected(bool stopCalled)
