@@ -136,8 +136,15 @@ function createLatencyGradient(ctx, chartArea, scales) {
         const position = i / numStops; // 0 = bottom, 1 = top
         const latencyAtPosition = position * yMax;
         
-        // Alpha increases slightly with latency for better visual distinction
-        const alpha = 0.25 + (position * 0.25); // 0.25 at bottom to 0.50 at top
+        // Green zone (<=150ms) stays at 0.2 alpha to match memory chart fill;
+        // alpha ramps up only as color transitions to yellow/orange/red
+        let alpha;
+        if (latencyAtPosition <= 150) {
+            alpha = 0.2;
+        } else {
+            const t = Math.min(1, (latencyAtPosition - 150) / Math.max(1, yMax - 150));
+            alpha = 0.2 + (t * 0.3);
+        }
         
         const color = getInterpolatedLatencyColorRGBA(latencyAtPosition, alpha);
         gradient.addColorStop(position, color);
@@ -496,7 +503,7 @@ function initializeCharts() {
                     label: 'Memory MB',
                     data: [],
                     borderColor: '#107c10',
-                    backgroundColor: 'rgba(16, 124, 16, 0.1)',
+                    backgroundColor: 'rgba(16, 124, 16, 0.2)',
                     tension: 0.3,
                     fill: 'origin',
                     yAxisID: 'y1',
@@ -951,27 +958,34 @@ function handleIdleState(data) {
     state.isIdle = data.isIdle;
     
     // Always update the connection status indicator based on current idle state
-    if (data.isIdle) {
-        // Only log and disconnect if transitioning to idle (not on every message)
-        if (!wasIdle) {
-            logEvent('idle', data.message || 'Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.');
-            updateConnectionStatus('idle', 'Idle');
+    if (data.isIdle && !wasIdle) {
+        // Transitioning to idle: stop charts, disconnect
+        logEvent('idle', data.message || 'Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.');
+        updateConnectionStatus('idle', 'Idle');
 
-            // Stop chart update timers (no data while idle)
-            stopChartUpdateTimers();
+        // Stop chart update timers (no data while idle)
+        stopChartUpdateTimers();
 
-            // Intentionally close SignalR to prevent reconnect-induced status flicker
-            state.intentionalDisconnect = true;
-            if ($.connection.hub && $.connection.hub.state !== $.signalR.connectionState.disconnected) {
-                $.connection.hub.stop();
-            }
+        // Intentionally close SignalR to prevent reconnect-induced status flicker
+        state.intentionalDisconnect = true;
+        if ($.connection.hub && $.connection.hub.state !== $.signalR.connectionState.disconnected) {
+            $.connection.hub.stop();
         }
+    } else if (data.isIdle && wasIdle) {
+        // Server confirms still idle - ensure status indicator is consistent
+        updateConnectionStatus('idle', 'Idle');
+    } else if (!data.isIdle && wasIdle) {
+        // Waking up (client knew we were idle)
+        logEvent('system', data.message || 'App waking up from idle state. There may be gaps in diagnostics and logs.');
+        updateConnectionStatus('connected', 'Connected');
+        // Restart chart updates now that probes will resume
+        startChartUpdateTimers();
+    } else if (!data.isIdle && !wasIdle && data.message && data.message.toLowerCase().includes('waking up')) {
+        // Server was idle but client didn't know (e.g., after reconnect)
+        logEvent('system', data.message);
+        updateConnectionStatus('connected', 'Connected');
     } else {
         updateConnectionStatus('connected', 'Connected');
-        // Log wake-up message if transitioning from idle or message indicates waking
-        if (wasIdle || (data.message && data.message.toLowerCase().includes('waking up'))) {
-            logEvent('system', data.message || 'App waking up from idle state. There may be gaps in diagnostics and logs.');
-        }
     }
 }
 
@@ -1119,14 +1133,11 @@ function updateLatencyChart() {
     
     const history = state.latencyHistory;
     
-    // Create gradient based on chart's actual dimensions
+    // Create gradient based on chart's actual dimensions using shared gradient function
     const ctx = state.charts.latency.ctx;
     const chartArea = state.charts.latency.chartArea;
-    const gradientHeight = chartArea ? (chartArea.bottom - chartArea.top) : 200;
-    const gradient = ctx.createLinearGradient(0, 0, 0, gradientHeight);
-    gradient.addColorStop(0, 'rgba(209, 52, 56, 0.3)');   // Red at top (high latency)
-    gradient.addColorStop(0.5, 'rgba(255, 185, 0, 0.2)'); // Yellow in middle
-    gradient.addColorStop(1, 'rgba(16, 124, 16, 0.1)');   // Green at bottom (low latency)
+    const scales = state.charts.latency.scales;
+    const gradient = createLatencyGradient(ctx, chartArea, scales);
     
     // Map data points to colors based on latency
     const pointColors = history.values.map((v, i) => {
