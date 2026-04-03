@@ -183,6 +183,7 @@ const state = {
     activeSimulations: new Map(),
     lastProcessId: null,
     isIdle: false,  // Tracks whether the server is in idle state
+    intentionalDisconnect: false,  // True when WS is closed on purpose (idle), suppresses reconnect
     lastFailedRequestCompletedAt: null  // Suppress load test stats after failed request sim
 };
 
@@ -272,6 +273,7 @@ function initializeSignalR() {
             updateConnectionStatus('connecting', 'Reconnecting...');
             logEvent('warning', 'Connection lost. Attempting to reconnect...');
         } else if (change.newState === $.signalR.connectionState.connected) {
+            state.intentionalDisconnect = false;
             // Don't set to 'connected' here - let the server's idle state message determine the status
             // The server sends idle state in OnConnected, which will set the correct status
             if (change.oldState === $.signalR.connectionState.reconnecting) {
@@ -284,6 +286,10 @@ function initializeSignalR() {
     });
 
     $.connection.hub.disconnected(function () {
+        // If we intentionally closed the connection (idle), don't update status or reconnect
+        if (state.intentionalDisconnect) {
+            return;
+        }
         updateConnectionStatus('disconnected', 'Disconnected');
         logEvent('warning', 'Connection closed. Attempting to reconnect...');
         // Auto-reconnect after close
@@ -306,6 +312,7 @@ function initializeSignalR() {
             // which will trigger handleIdleState to set the correct status
             logEvent('success', 'Connected to metrics hub');
             state.connection = hub;
+            state.intentionalDisconnect = false;
             
             // Wake up the server on initial page load
             // This also triggers a response with the current idle state
@@ -321,6 +328,24 @@ function initializeSignalR() {
             // Try again after delay
             setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
         });
+}
+
+/**
+ * Ensures the SignalR connection is active.
+ * If the connection is null, stopped, or stopping, re-initializes it.
+ * Called at the top of every simulation trigger so clicking any button
+ * automatically reconnects after an intentional idle disconnect.
+ */
+function ensureSignalR() {
+    var hubState = $.connection.hub && $.connection.hub.state;
+    if (!state.connection ||
+        hubState === $.signalR.connectionState.disconnected ||
+        hubState === undefined) {
+        state.intentionalDisconnect = false;
+        state.isIdle = false;
+        startChartUpdateTimers();
+        initializeSignalR();
+    }
 }
 
 function updateConnectionStatus(status, text) {
@@ -927,10 +952,19 @@ function handleIdleState(data) {
     
     // Always update the connection status indicator based on current idle state
     if (data.isIdle) {
-        updateConnectionStatus('idle', 'Idle');
-        // Only log if transitioning to idle (not on every message)
+        // Only log and disconnect if transitioning to idle (not on every message)
         if (!wasIdle) {
             logEvent('idle', data.message || 'Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.');
+            updateConnectionStatus('idle', 'Idle');
+
+            // Stop chart update timers (no data while idle)
+            stopChartUpdateTimers();
+
+            // Intentionally close SignalR to prevent reconnect-induced status flicker
+            state.intentionalDisconnect = true;
+            if ($.connection.hub && $.connection.hub.state !== $.signalR.connectionState.disconnected) {
+                $.connection.hub.stop();
+            }
         }
     } else {
         updateConnectionStatus('connected', 'Connected');
@@ -1125,6 +1159,7 @@ function updateLatencyChart() {
 // ==========================================================================
 
 async function triggerCpuStress() {
+    ensureSignalR();
     const duration = parseInt(document.getElementById('cpuDuration').value) || 30;
     const level = document.getElementById('cpuLevel').value || 'high';
     
@@ -1157,6 +1192,7 @@ async function triggerCpuStress() {
  * Stops all active CPU stress simulations.
  */
 async function stopCpuStress() {
+    ensureSignalR();
     try {
         logEvent('cpu', 'Stopping CPU stress simulations...');
         const response = await fetch(`${CONFIG.apiBaseUrl}/cpu/stop`, {
@@ -1178,6 +1214,7 @@ async function stopCpuStress() {
 }
 
 async function allocateMemory() {
+    ensureSignalR();
     const sizeMb = parseInt(document.getElementById('memorySize').value) || 100;
     
     try {
@@ -1203,6 +1240,7 @@ async function allocateMemory() {
 }
 
 async function releaseMemory() {
+    ensureSignalR();
     try {
         logEvent('memory', 'Releasing all allocated memory...');
         const response = await fetch(`${CONFIG.apiBaseUrl}/memory/release-memory`, {
@@ -1230,6 +1268,7 @@ async function releaseMemory() {
 }
 
 async function triggerThreadBlock() {
+    ensureSignalR();
     const delaySeconds = parseFloat(document.getElementById('threadDelay').value) || 10;
     const delayMs = Math.round(delaySeconds * 1000);
     const concurrent = parseInt(document.getElementById('threadConcurrent').value) || 100;
@@ -1262,6 +1301,7 @@ async function triggerThreadBlock() {
  * Stops all active thread pool starvation simulations.
  */
 async function stopThreadBlock() {
+    ensureSignalR();
     try {
         logEvent('threads', 'Stopping thread blocking simulations...');
         const response = await fetch(`${CONFIG.apiBaseUrl}/threadblock/stop`, {
@@ -1287,6 +1327,7 @@ async function stopThreadBlock() {
  * WARNING: This will terminate the application!
  */
 async function triggerCrash() {
+    ensureSignalR();
     const crashType = document.getElementById('crashType').value;
     // Delay option removed from UI - default to 0 (immediate crash)
     const delayElement = document.getElementById('crashDelay');
@@ -1361,6 +1402,7 @@ async function triggerCrash() {
  * Generates requests with sync-over-async patterns for CLR Profiler analysis.
  */
 async function startSlowRequests() {
+    ensureSignalR();
     const durationSeconds = parseInt(document.getElementById('slowRequestDuration').value) || 25;
     const intervalSeconds = parseInt(document.getElementById('slowRequestInterval').value) || 2;
     const maxRequests = parseInt(document.getElementById('slowRequestMax').value) || 10;
@@ -1411,6 +1453,7 @@ async function startSlowRequests() {
  * Stops the slow request simulator.
  */
 async function stopSlowRequests() {
+    ensureSignalR();
     const statusDiv = document.getElementById('slowRequestStatus');
     const startBtn = document.getElementById('btnStartSlowRequests');
     const stopBtn = document.getElementById('btnStopSlowRequests');
@@ -1448,6 +1491,7 @@ async function stopSlowRequests() {
  * Generates HTTP 500 errors visible in AppLens and Application Insights.
  */
 async function startFailedRequests() {
+    ensureSignalR();
     const requestCount = parseInt(document.getElementById('failedRequestCount').value) || 10;
     
     const startBtn = document.getElementById('btnStartFailedRequests');
