@@ -2013,14 +2013,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Fetch app configuration
     await fetchAppConfig();
     
-    // Fetch SKU info (non-blocking)
-    fetchAzureSku();
-    
     // Fetch build info (non-blocking)
     fetchBuildInfo();
-    
-    // Start SignalR connection (receives probe results from server)
-    initializeSignalR();
     
     // Start fixed-interval chart update timers (decoupled from server data rate)
     startChartUpdateTimers();
@@ -2053,11 +2047,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Wire up side panel toggle
     initializeSidePanel();
     
-    logEvent('system', `Dashboard initialized (probe rate: ${CONFIG.latencyProbeIntervalMs}ms, idle timeout: ${CONFIG.idleTimeoutMinutes}m)`);
-
-    // Static license disclaimers (Line 2 first so Line 1 appears on top)
+    // Log init messages in display order (prepended: first logged = bottom of log)
     logEvent('warning', '⚖️ Deploy only in isolated, non-production environments. Licensed under MIT License.');
     logEvent('warning', '⚖️ This software is provided "AS IS" without warranty. The author shall not be liable for any damages arising from use or misuse.');
+    logEvent('system', `Dashboard initialized (probe rate: ${CONFIG.latencyProbeIntervalMs}ms, idle timeout: ${CONFIG.idleTimeoutMinutes}m)`);
+
+    // Await SKU fetch so its message appears before hub connection messages
+    await fetchAzureSku();
+
+    // Start SignalR last — "Connected" and "Waking up" messages appear at top
+    initializeSignalR();
 });
 
 // ==========================================================================

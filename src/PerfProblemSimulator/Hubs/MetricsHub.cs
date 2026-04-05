@@ -157,20 +157,6 @@ namespace PerfProblemSimulator.Hubs
             {
                 Logger.Info("Server woken up by client request from: {0}", Context.ConnectionId);
             }
-
-            // Always send current idle state directly to the caller.
-            // When waking from idle, the broadcast via MetricsBroadcastService may be
-            // delayed (queued on the dedicated broadcast thread), so we must send
-            // the updated state directly to ensure the client knows we're active.
-            var idleData = new IdleStateData
-            {
-                IsIdle = false,
-                Message = wasIdle
-                    ? "App waking up from idle state. There may be gaps in diagnostics and logs."
-                    : "Application is active",
-                Timestamp = DateTimeOffset.UtcNow
-            };
-            Clients.Caller.receiveIdleState(idleData);
         }
     }
 }
