@@ -965,6 +965,49 @@ body.page-secondary {
 .log-time {
     color: var(--color-text-muted);
     margin-right: 0.75rem;
+    position: relative;
+    border-bottom: 1px dotted currentColor;
+    cursor: default;
+}
+
+.log-time::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    background: var(--color-text);
+    color: var(--color-card);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 400;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-fast), visibility var(--transition-fast);
+    z-index: 100;
+    box-shadow: var(--shadow-sm);
+}
+
+.log-time::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--color-text);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition-fast), visibility var(--transition-fast);
+    z-index: 100;
+}
+
+.log-time:hover::after,
+.log-time:hover::before {
+    opacity: 1;
+    visibility: visible;
 }
 
 /* Log entry simulation-themed colors (matching control group borders) */

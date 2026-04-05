@@ -1899,7 +1899,9 @@ function logEvent(levelOrCategory, message, options = {}) {
     entry.className = `log-entry ${cssClass}`;
     
     const iconHtml = icon ? `<span class="log-icon">${icon}</span>` : '';
-    entry.innerHTML = `<span class="log-time">${time} UTC</span>${iconHtml}${message}`;
+    const now = new Date();
+    const localTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+    entry.innerHTML = `<span class="log-time" data-tooltip="Local Time: ${localTime}">${time} UTC</span>${iconHtml}${message}`;
     
     log.insertBefore(entry, log.firstChild);
 }
