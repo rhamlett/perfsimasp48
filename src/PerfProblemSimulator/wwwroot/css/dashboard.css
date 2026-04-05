@@ -973,9 +973,8 @@ body.page-secondary {
 .log-time::after {
     content: attr(data-tooltip);
     position: absolute;
-    left: 50%;
-    bottom: calc(100% + 8px);
-    transform: translateX(-50%);
+    left: 0;
+    top: calc(100% + 8px);
     background: var(--color-text);
     color: var(--color-card);
     padding: 0.5rem 0.75rem;
@@ -993,11 +992,10 @@ body.page-secondary {
 .log-time::before {
     content: '';
     position: absolute;
-    left: 50%;
-    bottom: calc(100% + 2px);
-    transform: translateX(-50%);
+    left: 1rem;
+    top: calc(100% + 2px);
     border: 6px solid transparent;
-    border-top-color: var(--color-text);
+    border-bottom-color: var(--color-text);
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-fast), visibility var(--transition-fast);
