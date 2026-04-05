@@ -315,8 +315,7 @@ function initializeSignalR() {
     updateConnectionStatus('connecting', 'Connecting...');
     $.connection.hub.start()
         .done(function () {
-            // Don't set status here - the server sends idle state in OnConnected
-            // which will trigger handleIdleState to set the correct status
+            updateConnectionStatus('connected', 'Connected');
             logEvent('success', 'Connected to metrics hub');
             state.connection = hub;
             state.intentionalDisconnect = false;
