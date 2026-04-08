@@ -516,75 +516,6 @@
             </div>
         </section>
 
-        <!-- Architecture Section -->
-        <section id="architecture" class="doc-section">
-            <h2>📐 Architecture</h2>
-            <div class="architecture-tree"><span class="folder">src/PerfProblemSimulator/</span>
-├── <span class="folder">Controllers/</span>              <span class="comment"># API endpoints</span>
-│   ├── <span class="file">AdminController.cs</span>
-│   ├── <span class="file">ConfigController.cs</span>
-│   ├── <span class="file">CpuController.cs</span>
-│   ├── <span class="file">CrashController.cs</span>
-│   ├── <span class="file">FailedRequestController.cs</span>
-│   ├── <span class="file">HealthController.cs</span>
-│   ├── <span class="file">LoadTestController.cs</span>     <span class="comment"># Azure Load Testing endpoint</span>
-│   ├── <span class="file">MemoryController.cs</span>
-│   ├── <span class="file">MetricsController.cs</span>
-│   ├── <span class="file">SlowRequestController.cs</span>
-│   └── <span class="file">ThreadBlockController.cs</span>
-│
-├── <span class="folder">Services/</span>                 <span class="comment"># Business logic</span>
-│   ├── <span class="file">CpuStressService.cs</span>
-│   ├── <span class="file">CrashService.cs</span>
-│   ├── <span class="file">FailedRequestService.cs</span>
-│   ├── <span class="file">IdleStateService.cs</span>
-│   ├── <span class="file">LatencyProbeService.cs</span>
-│   ├── <span class="file">LoadTestService.cs</span>        <span class="comment"># Load test with soft limit degradation</span>
-│   ├── <span class="file">MemoryPressureService.cs</span>
-│   ├── <span class="file">MetricsBroadcastService.cs</span>
-│   ├── <span class="file">MetricsCollector.cs</span>
-│   ├── <span class="file">SimulationTracker.cs</span>
-│   ├── <span class="file">SlowRequestService.cs</span>
-│   ├── <span class="file">ThreadBlockService.cs</span>
-│   └── <span class="file">I*.cs</span>                    <span class="comment"># Interfaces</span>
-│
-├── <span class="folder">Hubs/</span>                     <span class="comment"># SignalR for real-time updates</span>
-│   ├── <span class="file">MetricsHub.cs</span>
-│   └── <span class="file">IMetricsClient.cs</span>
-│
-├── <span class="folder">Models/</span>                   <span class="comment"># Data transfer objects</span>
-│   ├── <span class="file">AllocatedMemoryBlock.cs</span>
-│   ├── <span class="file">CpuStressRequest.cs</span>
-│   ├── <span class="file">CrashRequest.cs</span>
-│   ├── <span class="file">DetailedMetrics.cs</span>
-│   ├── <span class="file">ErrorResponse.cs</span>
-│   ├── <span class="file">LoadTestRequest.cs</span>        <span class="comment"># Load test parameters</span>
-│   ├── <span class="file">LoadTestResult.cs</span>         <span class="comment"># Load test response</span>
-│   ├── <span class="file">MemoryAllocationRequest.cs</span>
-│   ├── <span class="file">MemoryReleaseResult.cs</span>
-│   ├── <span class="file">MetricsSnapshot.cs</span>
-│   ├── <span class="file">ProblemSimulatorOptions.cs</span>
-│   ├── <span class="file">SimulationResult.cs</span>
-│   ├── <span class="file">SimulationType.cs</span>
-│   ├── <span class="file">SlowRequestRequest.cs</span>
-│   └── <span class="file">ThreadBlockRequest.cs</span>
-│
-├── <span class="folder">App_Start/</span>               <span class="comment"># ASP.NET 4.8 configuration</span>
-│   ├── <span class="file">ConfigurationHelper.cs</span>
-│   ├── <span class="file">SwaggerConfig.cs</span>
-│   └── <span class="file">UnityConfig.cs</span>           <span class="comment"># Dependency injection</span>
-│
-└── <span class="folder">wwwroot/</span>                  <span class="comment"># SPA dashboard</span>
-    ├── <span class="file">index.html</span>
-    ├── <span class="file">documentation.html</span>
-    ├── <span class="file">azure-monitoring-guide.html</span>
-    ├── <span class="file">azure-load-testing.html</span>
-    ├── <span class="file">azure-deployment.html</span>
-    ├── <span class="file">favicon.svg</span>
-    └── <span class="folder">css/</span>
-        └── <span class="file">dashboard.css</span></div>
-        </section>
-
         <!-- Dashboard Section -->
         <section id="dashboard" class="doc-section">
             <h2>📊 Dashboard</h2>
@@ -1112,6 +1043,202 @@ var result = await SomeAsyncMethod();</code></pre>
             <p>See the <a href="/azure-monitoring-guide.html#failedrequests">Azure Diagnostics Guide</a> for detailed AppLens analysis instructions.</p>
         </section>
 
+        <!-- Optional Configuration Section -->
+        <section id="optional-config" class="doc-section">
+            <h2>⚙️ Optional Configuration</h2>
+            <p>You can customize the application behavior using Azure App Service environment variables.</p>
+
+            <h3>Health Probe Rate</h3>
+            <p>Control how often the server sends health probes to measure request latency. All probes are routed through the Azure frontend to capture realistic end-to-end latency.</p>
+            
+            <h4>Environment Variable</h4>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Variable Name</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>HEALTH_PROBE_RATE</code></td>
+                        <td>Probe interval in milliseconds. Minimum 100ms.</td>
+                        <td><code>200</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Setting via Azure CLI</h4>
+            <div class="code-block"><span class="comment"># Slow down probes if CLR profiler shows overlapping requests</span>
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP \
+  --settings HEALTH_PROBE_RATE=400</div>
+
+            <h3>Idle Timeout</h3>
+            <p>When the application is idle (no dashboard connections or load test requests), health probes are automatically suspended to reduce unnecessary network traffic to Azure's frontend and Application Insights telemetry.</p>
+            
+            <h4>Environment Variable</h4>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Variable Name</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>IDLE_TIMEOUT_MINUTES</code></td>
+                        <td>Minutes of inactivity before suspending health probes. Activity resumes automatically when the dashboard is opened or any request is received.</td>
+                        <td><code>20</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Setting via Azure CLI</h4>
+            <div class="code-block"><span class="comment"># Extend idle timeout to 30 minutes</span>
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP \
+  --settings IDLE_TIMEOUT_MINUTES=30</div>
+
+            <h3>Custom Page Footer</h3>
+            <p>Set a custom footer message that appears on all pages. The footer supports HTML, allowing you to include links.</p>
+            
+            <h4>Environment Variable</h4>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Variable Name</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>PAGE_FOOTER</code></td>
+                        <td>HTML content for the footer's second line. If not set, only the app description and build info are shown.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Example Value</h4>
+            <div class="code-block">Created by &lt;a href="https://yoursite.com"&gt;Your Team&lt;/a&gt; for training purposes</div>
+
+            <h4>Setting via Azure CLI</h4>
+            <div class="code-block"><span class="comment"># Set the footer via Azure CLI</span>
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP \
+  --settings 'PAGE_FOOTER=Created by &lt;a href="https://yoursite.com"&gt;Your Team&lt;/a&gt; for training purposes'</div>
+
+            <h4>Setting via Azure Portal</h4>
+            <ol>
+                <li>Navigate to your App Service in the Azure Portal</li>
+                <li>Go to <strong>Settings</strong> → <strong>Environment variables</strong></li>
+                <li>Click <strong>+ Add</strong></li>
+                <li>Set Name: <code>PAGE_FOOTER</code></li>
+                <li>Set Value: Your HTML footer content</li>
+                <li>Click <strong>Apply</strong>, then <strong>Confirm</strong></li>
+            </ol>
+
+            <h3>GitHub Repository Link</h3>
+            <p>Display a link to the GitHub repository in the sidebar menu. The link is hidden by default and only appears when both environment variables are configured.</p>
+            
+            <h4>Environment Variables</h4>
+            <table class="api-table">
+                <thead>
+                    <tr>
+                        <th>Variable Name</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GITHUB_USER_NAME</code></td>
+                        <td>GitHub user or organization name (e.g., <code>contoso</code>)</td>
+                    </tr>
+                    <tr>
+                        <td><code>GITHUB_REPO_NAME</code></td>
+                        <td>Repository name (e.g., <code>perf-simulator</code>)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h4>Setting via Azure CLI</h4>
+            <div class="code-block"><span class="comment"># Enable GitHub link in the sidebar menu</span>
+az webapp config appsettings set --name $APP_NAME --resource-group $RESOURCE_GROUP \
+  --settings GITHUB_USER_NAME=contoso GITHUB_REPO_NAME=perf-simulator</div>
+
+        </section>
+
+        <!-- Architecture Section -->
+        <section id="architecture" class="doc-section">
+            <h2>📐 Architecture</h2>
+            <div class="architecture-tree"><span class="folder">src/PerfProblemSimulator/</span>
+├── <span class="folder">Controllers/</span>              <span class="comment"># API endpoints</span>
+│   ├── <span class="file">AdminController.cs</span>
+│   ├── <span class="file">ConfigController.cs</span>
+│   ├── <span class="file">CpuController.cs</span>
+│   ├── <span class="file">CrashController.cs</span>
+│   ├── <span class="file">FailedRequestController.cs</span>
+│   ├── <span class="file">HealthController.cs</span>
+│   ├── <span class="file">LoadTestController.cs</span>     <span class="comment"># Azure Load Testing endpoint</span>
+│   ├── <span class="file">MemoryController.cs</span>
+│   ├── <span class="file">MetricsController.cs</span>
+│   ├── <span class="file">SlowRequestController.cs</span>
+│   └── <span class="file">ThreadBlockController.cs</span>
+│
+├── <span class="folder">Services/</span>                 <span class="comment"># Business logic</span>
+│   ├── <span class="file">CpuStressService.cs</span>
+│   ├── <span class="file">CrashService.cs</span>
+│   ├── <span class="file">FailedRequestService.cs</span>
+│   ├── <span class="file">IdleStateService.cs</span>
+│   ├── <span class="file">LatencyProbeService.cs</span>
+│   ├── <span class="file">LoadTestService.cs</span>        <span class="comment"># Load test with soft limit degradation</span>
+│   ├── <span class="file">MemoryPressureService.cs</span>
+│   ├── <span class="file">MetricsBroadcastService.cs</span>
+│   ├── <span class="file">MetricsCollector.cs</span>
+│   ├── <span class="file">SimulationTelemetry.cs</span>
+│   ├── <span class="file">SimulationTracker.cs</span>
+│   ├── <span class="file">SlowRequestService.cs</span>
+│   ├── <span class="file">ThreadBlockService.cs</span>
+│   └── <span class="file">I*.cs</span>                    <span class="comment"># Interfaces</span>
+│
+├── <span class="folder">Hubs/</span>                     <span class="comment"># SignalR for real-time updates</span>
+│   ├── <span class="file">MetricsHub.cs</span>
+│   └── <span class="file">IMetricsClient.cs</span>
+│
+├── <span class="folder">Models/</span>                   <span class="comment"># Data transfer objects</span>
+│   ├── <span class="file">AllocatedMemoryBlock.cs</span>
+│   ├── <span class="file">CpuStressRequest.cs</span>
+│   ├── <span class="file">CrashRequest.cs</span>
+│   ├── <span class="file">DetailedMetrics.cs</span>
+│   ├── <span class="file">ErrorResponse.cs</span>
+│   ├── <span class="file">LoadTestRequest.cs</span>        <span class="comment"># Load test parameters</span>
+│   ├── <span class="file">LoadTestResult.cs</span>         <span class="comment"># Load test response</span>
+│   ├── <span class="file">MemoryAllocationRequest.cs</span>
+│   ├── <span class="file">MemoryReleaseResult.cs</span>
+│   ├── <span class="file">MetricsSnapshot.cs</span>
+│   ├── <span class="file">ProblemSimulatorOptions.cs</span>
+│   ├── <span class="file">SimulationResult.cs</span>
+│   ├── <span class="file">SimulationType.cs</span>
+│   ├── <span class="file">SlowRequestRequest.cs</span>
+│   └── <span class="file">ThreadBlockRequest.cs</span>
+│
+├── <span class="folder">App_Start/</span>               <span class="comment"># ASP.NET 4.8 configuration</span>
+│   ├── <span class="file">ConfigurationHelper.cs</span>
+│   ├── <span class="file">SwaggerConfig.cs</span>
+│   └── <span class="file">UnityConfig.cs</span>           <span class="comment"># Dependency injection</span>
+│
+└── <span class="folder">wwwroot/</span>                  <span class="comment"># SPA dashboard</span>
+    ├── <span class="file">index.html</span>
+    ├── <span class="file">documentation.html</span>
+    ├── <span class="file">azure-monitoring-guide.html</span>
+    ├── <span class="file">azure-load-testing.html</span>
+    ├── <span class="file">azure-deployment.html</span>
+    ├── <span class="file">favicon.svg</span>
+    ├── <span class="folder">css/</span>
+    │   └── <span class="file">dashboard.css</span>
+    └── <span class="folder">js/</span>
+        └── <span class="file">dashboard.js</span></div>
+        </section>
+
         <!-- Footer -->
         <footer class="footer">
             <p>Performance Problem Simulator — Educational Tool for Azure App Service Diagnostics</p>
@@ -1129,9 +1256,6 @@ var result = await SomeAsyncMethod();</code></pre>
                     <ul>
                         <li class="doc-toc-item">
                             <a href="#overview"><span class="toc-icon">🎯</span>Overview</a>
-                        </li>
-                        <li class="doc-toc-item">
-                            <a href="#architecture"><span class="toc-icon">📐</span>Architecture</a>
                         </li>
                         <li class="doc-toc-divider-item" aria-hidden="true"></li>
                         <li class="doc-toc-section-item">Features</li>
@@ -1158,6 +1282,14 @@ var result = await SomeAsyncMethod();</code></pre>
                         </li>
                         <li class="doc-toc-item">
                             <a href="#failedrequests"><span class="toc-icon">❌</span>Failed Requests</a>
+                        </li>
+                        <li class="doc-toc-divider-item" aria-hidden="true"></li>
+                        <li class="doc-toc-section-item">References</li>
+                        <li class="doc-toc-item">
+                            <a href="#optional-config"><span class="toc-icon">⚙️</span>Optional Config</a>
+                        </li>
+                        <li class="doc-toc-item">
+                            <a href="#architecture"><span class="toc-icon">📐</span>Architecture</a>
                         </li>
                     </ul>
                 </nav>
