@@ -1,23 +1,35 @@
 using System;
+using System.Linq;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector;
+using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector.QuickPulse;
+using Microsoft.ApplicationInsights.WindowsServer;
+using Microsoft.ApplicationInsights.WindowsServer.TelemetryChannel;
 using NLog;
 
 namespace PerfProblemSimulator.App_Start
 {
     /// <summary>
-    /// Sets the Application Insights connection string on <see cref="TelemetryConfiguration.Active"/>.
-    /// All telemetry modules (request, dependency, exception, perf counters) are declared in
-    /// ApplicationInsights.config and auto-loaded by the SDK when this configuration is first accessed.
+    /// Initializes Application Insights entirely in code — does not depend on
+    /// ApplicationInsights.config being found at a particular filesystem path.
+    /// Registers request, dependency, exception, performance-counter, and Live Metrics
+    /// modules. No adaptive sampling is configured (100 % telemetry capture).
     /// Connection string is read from the APPLICATIONINSIGHTS_CONNECTION_STRING environment variable.
     /// </summary>
     public static class AppInsightsConfig
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        private static DependencyTrackingTelemetryModule _dependencyModule;
+        private static PerformanceCollectorModule _perfModule;
+        private static QuickPulseTelemetryModule _quickPulseModule;
+        private static AppServicesHeartbeatTelemetryModule _heartbeatModule;
+
         /// <summary>
-        /// Sets the connection string on <see cref="TelemetryConfiguration.Active"/>.
-        /// Must be called in Application_Start (before OWIN and before any HTTP module fires)
-        /// so the config file modules initialize with the correct endpoint.
+        /// Fully initializes Application Insights in code.
+        /// Must be called in Application_Start before OWIN startup.
         /// </summary>
         public static void Initialize()
         {
@@ -32,31 +44,109 @@ namespace PerfProblemSimulator.App_Start
 
             try
             {
-                // Accessing TelemetryConfiguration.Active for the first time triggers the SDK
-                // to read ApplicationInsights.config, which declares all telemetry modules,
-                // initializers, processors, and the server telemetry channel.
-                // We only need to inject the connection string (kept out of the config file
-                // so it is never committed to source control).
-                TelemetryConfiguration.Active.ConnectionString = connectionString;
+                Logger.Info("Initializing Application Insights (code-based)...");
+                Logger.Info("  BaseDirectory = {0}", AppDomain.CurrentDomain.BaseDirectory);
 
-                Logger.Info("Application Insights connection string set. " +
-                            "Modules from ApplicationInsights.config are active (request, dependency, exception, perf counters).");
+                // ------------------------------------------------------------------
+                // 1. Configure the shared TelemetryConfiguration
+                // ------------------------------------------------------------------
+                var config = TelemetryConfiguration.Active;
+                config.ConnectionString = connectionString;
+
+                // Use the server telemetry channel for reliable delivery
+                config.TelemetryChannel = new ServerTelemetryChannel();
+                ((ServerTelemetryChannel)config.TelemetryChannel).Initialize(config);
+
+                // ------------------------------------------------------------------
+                // 2. Remove any default adaptive sampling processors
+                //    (ensures 100 % capture)
+                // ------------------------------------------------------------------
+                // TelemetryConfiguration.Active may come with processors from the
+                // config file or SDK defaults. Clear processors and add only
+                // QuickPulse so Live Metrics works without sampling.
+                var builder = config.DefaultTelemetrySink.TelemetryProcessorChainBuilder;
+
+                // QuickPulse (Live Metrics) processor
+                _quickPulseModule = new QuickPulseTelemetryModule();
+                QuickPulseTelemetryProcessor quickPulseProcessor = null;
+                builder.Use(next =>
+                {
+                    quickPulseProcessor = new QuickPulseTelemetryProcessor(next);
+                    return quickPulseProcessor;
+                });
+                builder.Build();
+
+                _quickPulseModule.Initialize(config);
+                _quickPulseModule.RegisterTelemetryProcessor(quickPulseProcessor);
+
+                // ------------------------------------------------------------------
+                // 3. Register telemetry initializers
+                // ------------------------------------------------------------------
+                config.TelemetryInitializers.Add(new Microsoft.ApplicationInsights.Web.OperationNameTelemetryInitializer());
+                config.TelemetryInitializers.Add(new Microsoft.ApplicationInsights.Web.OperationCorrelationTelemetryInitializer());
+                config.TelemetryInitializers.Add(new Microsoft.ApplicationInsights.Web.UserTelemetryInitializer());
+                config.TelemetryInitializers.Add(new Microsoft.ApplicationInsights.Web.SessionTelemetryInitializer());
+                config.TelemetryInitializers.Add(new Microsoft.ApplicationInsights.Web.ClientIpHeaderTelemetryInitializer());
+                config.TelemetryInitializers.Add(new Microsoft.ApplicationInsights.Web.AzureAppServiceRoleNameFromHostNameHeaderInitializer());
+                config.TelemetryInitializers.Add(new HttpDependenciesParsingTelemetryInitializer());
+                config.TelemetryInitializers.Add(new AzureRoleEnvironmentTelemetryInitializer());
+
+                // ------------------------------------------------------------------
+                // 4. Register telemetry modules
+                // ------------------------------------------------------------------
+
+                // Dependency tracking (outbound HTTP, SQL, etc.)
+                _dependencyModule = new DependencyTrackingTelemetryModule();
+                _dependencyModule.ExcludeComponentCorrelationHttpHeadersOnDomains.Add("core.windows.net");
+                _dependencyModule.ExcludeComponentCorrelationHttpHeadersOnDomains.Add("core.chinacloudapi.cn");
+                _dependencyModule.ExcludeComponentCorrelationHttpHeadersOnDomains.Add("core.cloudapi.de");
+                _dependencyModule.ExcludeComponentCorrelationHttpHeadersOnDomains.Add("core.usgovcloudapi.net");
+                _dependencyModule.Initialize(config);
+
+                // Performance counter collection
+                _perfModule = new PerformanceCollectorModule();
+                _perfModule.Initialize(config);
+
+                // App Service heartbeat
+                _heartbeatModule = new AppServicesHeartbeatTelemetryModule();
+                _heartbeatModule.Initialize(config);
+
+                // Note: RequestTrackingTelemetryModule and ExceptionTrackingTelemetryModule
+                // are created internally by ApplicationInsightsHttpModule (registered in
+                // web.config). They do NOT need to be initialized here.
+
+                // ------------------------------------------------------------------
+                // 5. Verify the pipeline by sending a trace
+                // ------------------------------------------------------------------
+                var client = new TelemetryClient(config);
+                client.TrackTrace("Application Insights initialized (code-based). Modules: " +
+                                  "Request (HTTP module), Dependency, Exception, PerfCounters, QuickPulse.");
+                client.Flush();
+
+                Logger.Info("Application Insights fully initialized (code-based). " +
+                            "Modules: Request (HTTP module), Dependency, Exception, PerfCounters, LiveMetrics.");
+                Logger.Info("  TelemetryChannel type = {0}", config.TelemetryChannel?.GetType().FullName);
+                Logger.Info("  Initializers count = {0}", config.TelemetryInitializers.Count);
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex, "Failed to initialize Application Insights. Auto-tracking will be unavailable.");
+                Logger.Error(ex, "Failed to initialize Application Insights. Auto-tracking will be unavailable.");
             }
         }
 
         /// <summary>
-        /// Flushes pending telemetry. Call during application shutdown.
+        /// Flushes pending telemetry and disposes modules. Call during application shutdown.
         /// </summary>
         public static void Shutdown()
         {
             try
             {
+                _dependencyModule?.Dispose();
+                _perfModule?.Dispose();
+                _quickPulseModule?.Dispose();
+                _heartbeatModule?.Dispose();
                 TelemetryConfiguration.Active?.TelemetryChannel?.Flush();
-                Logger.Info("Application Insights telemetry flushed.");
+                Logger.Info("Application Insights telemetry flushed and shut down.");
             }
             catch (Exception ex)
             {
