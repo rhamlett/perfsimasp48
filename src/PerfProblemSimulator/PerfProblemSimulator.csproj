@@ -98,6 +98,7 @@
     <Content Include="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="web.config" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="NLog.config" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="ApplicationInsights.config" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Global.asax" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -1,26 +1,23 @@
 using System;
-using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.ApplicationInsights.Extensibility;
-using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector;
 using NLog;
 
 namespace PerfProblemSimulator.App_Start
 {
     /// <summary>
-    /// Initializes Application Insights with full telemetry:
-    /// automatic HTTP request tracking (via web.config HTTP module),
-    /// outbound dependency tracking, exception tracking, and performance counters.
+    /// Sets the Application Insights connection string on <see cref="TelemetryConfiguration.Active"/>.
+    /// All telemetry modules (request, dependency, exception, perf counters) are declared in
+    /// ApplicationInsights.config and auto-loaded by the SDK when this configuration is first accessed.
     /// Connection string is read from the APPLICATIONINSIGHTS_CONNECTION_STRING environment variable.
     /// </summary>
     public static class AppInsightsConfig
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private static DependencyTrackingTelemetryModule _dependencyModule;
-        private static PerformanceCollectorModule _perfModule;
 
         /// <summary>
-        /// Initializes Application Insights telemetry. Call once at application startup
-        /// before any HTTP requests are processed.
+        /// Sets the connection string on <see cref="TelemetryConfiguration.Active"/>.
+        /// Must be called in Application_Start (before OWIN and before any HTTP module fires)
+        /// so the config file modules initialize with the correct endpoint.
         /// </summary>
         public static void Initialize()
         {
@@ -35,28 +32,15 @@ namespace PerfProblemSimulator.App_Start
 
             try
             {
-                // Configure the shared/active TelemetryConfiguration used by auto-collectors and HTTP modules.
-                // The Web HTTP module (registered in web.config) uses TelemetryConfiguration.Active
-                // to report request and exception telemetry.
-                var config = TelemetryConfiguration.Active;
-                config.ConnectionString = connectionString;
+                // Accessing TelemetryConfiguration.Active for the first time triggers the SDK
+                // to read ApplicationInsights.config, which declares all telemetry modules,
+                // initializers, processors, and the server telemetry channel.
+                // We only need to inject the connection string (kept out of the config file
+                // so it is never committed to source control).
+                TelemetryConfiguration.Active.ConnectionString = connectionString;
 
-                // Disable adaptive sampling — user requires 100% telemetry capture.
-                // By default, the Web SDK enables adaptive sampling which drops telemetry
-                // under load. Setting no sampling processor ensures every request is recorded.
-                // (TelemetryConfiguration.Active has no sampling processors by default
-                //  when configured in code, so nothing to remove.)
-
-                // Initialize outbound dependency tracking (HTTP calls, SQL, etc.)
-                _dependencyModule = new DependencyTrackingTelemetryModule();
-                _dependencyModule.Initialize(config);
-
-                // Initialize performance counter collection
-                _perfModule = new PerformanceCollectorModule();
-                _perfModule.Initialize(config);
-
-                Logger.Info("Application Insights fully initialized — request tracking, dependency tracking, " +
-                            "exception tracking, and performance counters are active.");
+                Logger.Info("Application Insights connection string set. " +
+                            "Modules from ApplicationInsights.config are active (request, dependency, exception, perf counters).");
             }
             catch (Exception ex)
             {
@@ -65,17 +49,14 @@ namespace PerfProblemSimulator.App_Start
         }
 
         /// <summary>
-        /// Shuts down Application Insights modules and flushes pending telemetry.
-        /// Call during application shutdown.
+        /// Flushes pending telemetry. Call during application shutdown.
         /// </summary>
         public static void Shutdown()
         {
             try
             {
-                _dependencyModule?.Dispose();
-                _perfModule?.Dispose();
                 TelemetryConfiguration.Active?.TelemetryChannel?.Flush();
-                Logger.Info("Application Insights telemetry flushed and shut down.");
+                Logger.Info("Application Insights telemetry flushed.");
             }
             catch (Exception ex)
             {

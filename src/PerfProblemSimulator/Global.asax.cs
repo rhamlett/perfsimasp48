@@ -36,6 +36,13 @@ namespace PerfProblemSimulator
             Logger.Info("Application starting...");
             Logger.Info("=============================================================================");
 
+            // Initialize Application Insights BEFORE OWIN startup and before the first
+            // HTTP request. The IIS HTTP modules (ApplicationInsightsHttpModule,
+            // TelemetryCorrelationHttpModule) can fire as soon as IIS begins routing
+            // requests, so the connection string must already be on
+            // TelemetryConfiguration.Active by this point.
+            AppInsightsConfig.Initialize();
+
             // Note: Most configuration is done in Startup.cs (OWIN)
             // This event fires before OWIN startup
         }

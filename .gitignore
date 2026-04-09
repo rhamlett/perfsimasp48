@@ -87,7 +87,7 @@ secrets.json
 local.settings.json
 
 # Application Insights
-ApplicationInsights.config
+# ApplicationInsights.config is checked in — it declares telemetry modules and disables sampling.
 
 # =============================================================================
 # Publish / Deployment
