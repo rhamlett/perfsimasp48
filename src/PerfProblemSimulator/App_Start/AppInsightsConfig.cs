@@ -5,6 +5,7 @@ using Microsoft.ApplicationInsights.DependencyCollector;
 using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector;
 using Microsoft.ApplicationInsights.Extensibility.PerfCounterCollector.QuickPulse;
+using Microsoft.ApplicationInsights.Web;
 using Microsoft.ApplicationInsights.WindowsServer;
 using Microsoft.ApplicationInsights.WindowsServer.TelemetryChannel;
 using NLog;
@@ -22,6 +23,8 @@ namespace PerfProblemSimulator.App_Start
     {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
+        private static RequestTrackingTelemetryModule _requestModule;
+        private static ExceptionTrackingTelemetryModule _exceptionModule;
         private static DependencyTrackingTelemetryModule _dependencyModule;
         private static PerformanceCollectorModule _perfModule;
         private static QuickPulseTelemetryModule _quickPulseModule;
@@ -111,9 +114,14 @@ namespace PerfProblemSimulator.App_Start
                 _heartbeatModule = new AppServicesHeartbeatTelemetryModule();
                 _heartbeatModule.Initialize(config);
 
-                // Note: RequestTrackingTelemetryModule and ExceptionTrackingTelemetryModule
-                // are created internally by ApplicationInsightsHttpModule (registered in
-                // web.config). They do NOT need to be initialized here.
+                // Request tracking — works with ApplicationInsightsHttpModule in web.config
+                // to capture every inbound HTTP request.
+                _requestModule = new RequestTrackingTelemetryModule();
+                _requestModule.Initialize(config);
+
+                // Exception tracking — captures unhandled exceptions in the IIS pipeline.
+                _exceptionModule = new ExceptionTrackingTelemetryModule();
+                _exceptionModule.Initialize(config);
 
                 // ------------------------------------------------------------------
                 // 5. Verify the pipeline by sending a trace
