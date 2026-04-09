@@ -45,6 +45,11 @@ namespace PerfProblemSimulator
             Logger.Info("Configuring OWIN pipeline...");
 
             // -----------------------------------------------------------------------------
+            // Application Insights (must be first — starts auto-tracking before requests flow)
+            // -----------------------------------------------------------------------------
+            AppInsightsConfig.Initialize();
+
+            // -----------------------------------------------------------------------------
             // CORS Configuration (must be before SignalR and Web API)
             // -----------------------------------------------------------------------------
             // Allow any origin for development. In production, restrict this.

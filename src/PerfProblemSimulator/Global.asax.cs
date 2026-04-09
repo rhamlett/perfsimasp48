@@ -1,6 +1,9 @@
 using System;
 using System.Web;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
 using NLog;
+using PerfProblemSimulator.App_Start;
 
 namespace PerfProblemSimulator
 {
@@ -44,6 +47,9 @@ namespace PerfProblemSimulator
         {
             Logger.Info("Performance Problem Simulator shutting down...");
             
+            // Flush pending Application Insights telemetry and dispose modules
+            AppInsightsConfig.Shutdown();
+            
             // Flush any pending log messages
             LogManager.Shutdown();
         }
@@ -55,6 +61,21 @@ namespace PerfProblemSimulator
         {
             var exception = Server.GetLastError();
             Logger.Error(exception, "Unhandled application error");
+
+            // Track to Application Insights so exceptions appear in the Failures blade
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(TelemetryConfiguration.Active?.ConnectionString))
+                {
+                    var telemetryClient = new TelemetryClient(TelemetryConfiguration.Active);
+                    telemetryClient.TrackException(exception);
+                    telemetryClient.Flush();
+                }
+            }
+            catch
+            {
+                // Swallow — never let telemetry failures mask the original error
+            }
         }
 
         /// <summary>

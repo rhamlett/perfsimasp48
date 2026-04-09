@@ -80,8 +80,10 @@
     <!-- DiagnosticSource for Activity-based telemetry correlation with Application Insights -->
     <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="8.0.1" />
     
-    <!-- Application Insights for custom event tracking (auto-configures from APPLICATIONINSIGHTS_CONNECTION_STRING) -->
-    <PackageReference Include="Microsoft.ApplicationInsights" Version="2.22.0" />
+    <!-- Application Insights Web SDK: auto-tracks HTTP requests, dependencies, exceptions, and perf counters.
+         Also provides TelemetryClient for custom event tracking.
+         Auto-configures from APPLICATIONINSIGHTS_CONNECTION_STRING environment variable. -->
+    <PackageReference Include="Microsoft.ApplicationInsights.Web" Version="2.22.0" />
   </ItemGroup>
 
   <!-- Framework References -->
