@@ -21,7 +21,7 @@ namespace PerfProblemSimulator.Services
         /// <summary>
         /// Initializes the telemetry service.
         /// Uses the shared TelemetryConfiguration.Active (configured by AppInsightsConfig)
-        /// so custom events flow through the same pipeline as auto-collected telemetry.
+        /// Reads APPLICATIONINSIGHTS_CONNECTION_STRING and creates a TelemetryClient.
         /// </summary>
         public SimulationTelemetry()
         {
@@ -37,10 +37,11 @@ namespace PerfProblemSimulator.Services
 
             try
             {
-                // Use the shared/active TelemetryConfiguration so custom events share the
-                // same pipeline (connection string, channel, processors) as auto-collected
-                // request, dependency, and exception telemetry.
-                _telemetryClient = new TelemetryClient(TelemetryConfiguration.Active);
+                var config = new TelemetryConfiguration
+                {
+                    ConnectionString = connectionString
+                };
+                _telemetryClient = new TelemetryClient(config);
                 _isEnabled = true;
                 Logger.Info("Application Insights telemetry enabled. SimulationStarted/SimulationEnded events will be tracked.");
             }

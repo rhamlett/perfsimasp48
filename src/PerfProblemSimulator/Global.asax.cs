@@ -1,7 +1,5 @@
 using System;
 using System.Web;
-using Microsoft.ApplicationInsights;
-using Microsoft.ApplicationInsights.Extensibility;
 using NLog;
 using PerfProblemSimulator.App_Start;
 
@@ -69,20 +67,8 @@ namespace PerfProblemSimulator
             var exception = Server.GetLastError();
             Logger.Error(exception, "Unhandled application error");
 
-            // Track to Application Insights so exceptions appear in the Failures blade
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(TelemetryConfiguration.Active?.ConnectionString))
-                {
-                    var telemetryClient = new TelemetryClient(TelemetryConfiguration.Active);
-                    telemetryClient.TrackException(exception);
-                    telemetryClient.Flush();
-                }
-            }
-            catch
-            {
-                // Swallow — never let telemetry failures mask the original error
-            }
+            // Exception tracking to Application Insights is handled automatically
+            // by the App Service codeless agent.
         }
 
         /// <summary>
