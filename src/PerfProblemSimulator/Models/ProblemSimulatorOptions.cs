@@ -74,5 +74,40 @@ public class ProblemSimulatorOptions
     /// Can be configured via environment variable: <c>DISABLE_PROBLEM_ENDPOINTS</c>
     /// </remarks>
     public bool DisableProblemEndpoints { get; set; } = false;
+
+    /// <summary>
+    /// The UI language for the dashboard. ISO 639-1 code (e.g., "en", "es", "ja").
+    /// When set to a non-English language, the TranslationStartupService generates
+    /// translated locale files at startup.
+    /// </summary>
+    /// <remarks>
+    /// Can be configured via environment variable: <c>UI_LANGUAGE</c>
+    /// </remarks>
+    public string UiLanguage { get; set; } = "en";
+
+    /// <summary>
+    /// Azure Cognitive Services Translator API key.
+    /// Required when UiLanguage is not "en".
+    /// </summary>
+    /// <remarks>
+    /// Can be configured via environment variable: <c>TRANSLATOR_API_KEY</c>
+    /// </remarks>
+    public string TranslatorApiKey { get; set; } = "";
+
+    /// <summary>
+    /// Azure Cognitive Services Translator endpoint URL.
+    /// </summary>
+    /// <remarks>
+    /// Can be configured via environment variable: <c>TRANSLATOR_ENDPOINT</c>
+    /// </remarks>
+    public string TranslatorEndpoint { get; set; } = "https://api.cognitive.microsofttranslator.com";
+
+    /// <summary>
+    /// Azure Cognitive Services Translator region.
+    /// </summary>
+    /// <remarks>
+    /// Can be configured via environment variable: <c>TRANSLATOR_REGION</c>
+    /// </remarks>
+    public string TranslatorRegion { get; set; } = "eastus";
 }
 }

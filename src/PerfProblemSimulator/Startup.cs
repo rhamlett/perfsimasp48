@@ -3,6 +3,7 @@ using Microsoft.Owin;
 using Microsoft.Owin.Cors;
 using Microsoft.Owin.FileSystems;
 using Microsoft.Owin.StaticFiles;
+using Microsoft.Owin.StaticFiles.ContentTypes;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using NLog;
@@ -54,6 +55,12 @@ namespace PerfProblemSimulator
             app.UseCors(CorsOptions.AllowAll);
 
             // -----------------------------------------------------------------------------
+            // Translated HTML Middleware (must be before Static Files)
+            // Rewrites .html requests to serve translated versions when available.
+            // -----------------------------------------------------------------------------
+            app.Use<Services.TranslatedHtmlMiddleware>();
+
+            // -----------------------------------------------------------------------------
             // Static Files (wwwroot)
             // -----------------------------------------------------------------------------
             ConfigureStaticFiles(app);
@@ -97,11 +104,18 @@ namespace PerfProblemSimulator
             {
                 var physicalFileSystem = new PhysicalFileSystem(wwwrootPath);
 
+                // Add JSON MIME type so locale files (en.json, etc.) are served correctly.
+                // OWIN's default content type provider doesn't include .json.
+                var contentTypeProvider = new FileExtensionContentTypeProvider();
+                contentTypeProvider.Mappings[".json"] = "application/json";
+
                 var options = new FileServerOptions
                 {
                     EnableDefaultFiles = true,
                     FileSystem = physicalFileSystem
                 };
+
+                options.StaticFileOptions.ContentTypeProvider = contentTypeProvider;
 
                 options.DefaultFilesOptions.DefaultFileNames.Clear();
                 options.DefaultFilesOptions.DefaultFileNames.Add("index.html");
@@ -192,6 +206,17 @@ namespace PerfProblemSimulator
         /// </summary>
         private void StartBackgroundServices()
         {
+            // Run translation at startup (before other services, blocks until complete)
+            var translationStartup = UnityConfig.Container.Resolve<Services.TranslationStartupService>();
+            try
+            {
+                translationStartup.RunAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Translation startup failed, continuing with English");
+            }
+
             // Start the metrics collector
             var metricsCollector = UnityConfig.Container.Resolve<Services.IMetricsCollector>();
             if (metricsCollector is Services.MetricsCollector collector)

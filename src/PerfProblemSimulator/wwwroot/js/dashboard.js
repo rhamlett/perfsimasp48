@@ -277,14 +277,14 @@ function initializeSignalR() {
         };
         
         if (change.newState === $.signalR.connectionState.reconnecting) {
-            updateConnectionStatus('connecting', 'Reconnecting...');
-            logEvent('warning', 'Connection lost. Attempting to reconnect...');
+            updateConnectionStatus('connecting', i18n('status.reconnecting'));
+            logEvent('warning', i18n('log.connection.lost'));
         } else if (change.newState === $.signalR.connectionState.connected) {
             state.intentionalDisconnect = false;
             // Don't set to 'connected' here - let the server's idle state message determine the status
             // The server sends idle state in OnConnected, which will set the correct status
             if (change.oldState === $.signalR.connectionState.reconnecting) {
-                logEvent('success', 'Reconnected to server');
+                logEvent('success', i18n('log.connection.reconnected'));
                 // NOTE: Do NOT call wakeUp() here. Auto-reconnects are framework-level and
                 // should not wake the app from idle. The server sends current idle state
                 // from OnReconnected, which will update the UI via handleIdleState.
@@ -297,8 +297,8 @@ function initializeSignalR() {
         if (state.intentionalDisconnect) {
             return;
         }
-        updateConnectionStatus('disconnected', 'Disconnected');
-        logEvent('warning', 'Connection closed. Attempting to reconnect...');
+        updateConnectionStatus('disconnected', i18n('status.disconnected'));
+        logEvent('warning', i18n('log.connection.closed'));
         // Auto-reconnect after close
         setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
     });
@@ -312,11 +312,11 @@ function initializeSignalR() {
     // It sets: $.hubConnection("/hubs/metrics/signalr", { useDefaultPath: false })
 
     // Start connection
-    updateConnectionStatus('connecting', 'Connecting...');
+    updateConnectionStatus('connecting', i18n('status.connecting'));
     $.connection.hub.start()
         .done(function () {
-            updateConnectionStatus('connected', 'Connected');
-            logEvent('success', 'Connected to metrics hub');
+            updateConnectionStatus('connected', i18n('status.connected'));
+            logEvent('success', i18n('log.connection.connected'));
             state.connection = hub;
             state.intentionalDisconnect = false;
             
@@ -325,12 +325,12 @@ function initializeSignalR() {
             hub.server.wakeUp()
                 .fail(function(err) {
                     console.error('WakeUp call failed:', err);
-                    logEvent('warning', 'Failed to wake server: ' + (err.message || err));
+                    logEvent('warning', i18n('log.connection.failed', { error: err.message || err }));
                 });
         })
         .fail(function (err) {
-            updateConnectionStatus('disconnected', 'Failed to connect');
-            logEvent('warning', 'Connection failed: ' + (err.message || err));
+            updateConnectionStatus('disconnected', i18n('status.connectionFailed'));
+            logEvent('warning', i18n('log.connection.failed', { error: err.message || err }));
             // Try again after delay
             setTimeout(initializeSignalR, CONFIG.reconnectDelayMs);
         });
@@ -383,7 +383,7 @@ function handleMetricsUpdate(snapshot) {
     // Check for application restart (process ID change)
     if (snapshot.processId) {
         if (state.lastProcessId !== null && state.lastProcessId !== snapshot.processId) {
-            logEvent('restart', `APPLICATION RESTARTED! Process ID changed from ${state.lastProcessId} to ${snapshot.processId}. This may indicate an unexpected crash (OOM, StackOverflow, etc.)`);
+            logEvent('restart', i18n('log.crash.restarted', { oldPid: state.lastProcessId, newPid: snapshot.processId }));
             // Clear all active simulations since the app restarted
             clearAllActiveSimulations();
         }
@@ -834,14 +834,14 @@ function handleLatencyUpdate(measurement) {
     if (measurement.isError) {
         if (measurement.source === 'FailedRequest') {
             const errorType = measurement.errorMessage || 'HTTP 5xx';
-            logEvent('failedrequests', `Failed Request: ${errorType} (${formatLatency(measurement.latencyMs)})`);
+            logEvent('failedrequests', i18n('log.failed.failedRequest', { errorType: errorType, latency: formatLatency(measurement.latencyMs) }));
         } else {
-            logEvent('system', `Health Probe Error: ${measurement.errorMessage || 'Unknown error'} (${formatLatency(measurement.latencyMs)})`);
+            logEvent('system', i18n('log.latency.error', { error: measurement.errorMessage || 'Unknown error', latency: formatLatency(measurement.latencyMs) }));
         }
     } else if (measurement.isTimeout) {
-        logEvent('system', `Health Probe Critical (>30s): ${formatLatency(measurement.latencyMs)}`);
+        logEvent('system', i18n('log.latency.critical', { latency: formatLatency(measurement.latencyMs) }));
     } else if (measurement.latencyMs > 10000) {
-        logEvent('warning', `High Latency Probe: ${formatLatency(measurement.latencyMs)}`);
+        logEvent('warning', i18n('log.latency.high', { latency: formatLatency(measurement.latencyMs) }));
     }
     
     // Store latest measurement for chart sampling timer
@@ -959,7 +959,7 @@ function handleIdleState(data) {
     // Always update the connection status indicator based on current idle state
     if (data.isIdle && !wasIdle) {
         // Transitioning to idle: stop charts, disconnect
-        logEvent('idle', data.message || 'Application going idle, no health probes being sent. There will be gaps in diagnostics and logs.');
+        logEvent('idle', i18n('log.idle.goingIdle'));
         updateConnectionStatus('idle', 'Idle');
 
         // Stop chart update timers (no data while idle)
@@ -975,16 +975,16 @@ function handleIdleState(data) {
         updateConnectionStatus('idle', 'Idle');
     } else if (!data.isIdle && wasIdle) {
         // Waking up (client knew we were idle)
-        logEvent('system', data.message || 'App waking up from idle state. There may be gaps in diagnostics and logs.');
-        updateConnectionStatus('connected', 'Connected');
+        logEvent('system', i18n('log.idle.wakingUp'));
+        updateConnectionStatus('connected', i18n('status.connected'));
         // Restart chart updates now that probes will resume
         startChartUpdateTimers();
     } else if (!data.isIdle && !wasIdle && data.message && data.message.toLowerCase().includes('waking up')) {
         // Server was idle but client didn't know (e.g., after reconnect)
-        logEvent('system', data.message);
-        updateConnectionStatus('connected', 'Connected');
+        logEvent('system', i18n('log.idle.wakingUp'));
+        updateConnectionStatus('connected', i18n('status.connected'));
     } else {
-        updateConnectionStatus('connected', 'Connected');
+        updateConnectionStatus('connected', i18n('status.connected'));
     }
 }
 
@@ -1174,7 +1174,7 @@ async function triggerCpuStress() {
     const level = document.getElementById('cpuLevel').value || 'high';
     
     try {
-        logEvent('cpu', `Triggering CPU stress for ${duration} seconds (${level})...`);
+        logEvent('cpu', i18n('log.cpu.triggering', { duration, level }));
         const response = await fetch(`${CONFIG.apiBaseUrl}/cpu/trigger-high-cpu`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1188,13 +1188,13 @@ async function triggerCpuStress() {
             const result = await response.json();
             const displayLevel = level.charAt(0).toUpperCase() + level.slice(1);
             addActiveSimulation(result.simulationId, 'cpu', `CPU Stress (${displayLevel})`);
-            logEvent('cpu', withSimulationId(`CPU stress started (${displayLevel})`, result.simulationId));
+            logEvent('cpu', withSimulationId(i18n('log.cpu.started', { level: displayLevel }), result.simulationId));
         } else {
             const error = await response.json();
-            logEvent('cpu', `Failed: ${error.detail || 'Unknown error'}`);
+            logEvent('cpu', i18n('log.cpu.failed', { error: error.detail || 'Unknown error' }));
         }
     } catch (err) {
-        logEvent('cpu', `Request failed: ${err.message}`);
+        logEvent('cpu', i18n('log.cpu.requestFailed', { error: err.message }));
     }
 }
 
@@ -1204,22 +1204,22 @@ async function triggerCpuStress() {
 async function stopCpuStress() {
     ensureSignalR();
     try {
-        logEvent('cpu', 'Stopping CPU stress simulations...');
+        logEvent('cpu', i18n('log.cpu.stopping'));
         const response = await fetch(`${CONFIG.apiBaseUrl}/cpu/stop`, {
             method: 'POST'
         });
         
         if (response.ok) {
             const result = await response.json();
-            logEvent('cpu', result.message || 'CPU stress stopped');
+            logEvent('cpu', result.message || i18n('log.cpu.stopped'));
             // Remove CPU simulations from active list
             removeSimulationsByType('cpu');
         } else {
             const error = await response.json();
-            logEvent('cpu', `Stop request: ${error.detail || 'May have already stopped'}`);
+            logEvent('cpu', i18n('log.cpu.stopRequest', { error: error.detail || 'May have already stopped' }));
         }
     } catch (err) {
-        logEvent('cpu', `Stop request: ${err.message || 'May have already stopped'}`);
+        logEvent('cpu', i18n('log.cpu.stopRequest', { error: err.message || 'May have already stopped' }));
     }
 }
 
@@ -1228,7 +1228,7 @@ async function allocateMemory() {
     const sizeMb = parseInt(document.getElementById('memorySize').value) || 100;
     
     try {
-        logEvent('memory', `Allocating ${sizeMb} MB of memory...`);
+        logEvent('memory', i18n('log.memory.allocating', { size: sizeMb }));
         const response = await fetch(`${CONFIG.apiBaseUrl}/memory/allocate-memory`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1239,20 +1239,20 @@ async function allocateMemory() {
             const result = await response.json();
             const actualSizeMb = result.actualParameters?.sizeMegabytes ?? sizeMb;
             addActiveSimulation(result.simulationId, 'memory', `Memory ${actualSizeMb}MB`);
-            logEvent('memory', withSimulationId(`Memory allocated (${actualSizeMb} MB)`, result.simulationId));
+            logEvent('memory', withSimulationId(i18n('log.memory.allocated', { size: actualSizeMb }), result.simulationId));
         } else {
             const error = await response.json();
-            logEvent('memory', `Failed: ${error.detail || 'Unknown error'}`);
+            logEvent('memory', i18n('log.memory.failed', { error: error.detail || 'Unknown error' }));
         }
     } catch (err) {
-        logEvent('memory', `Request failed: ${err.message}`);
+        logEvent('memory', i18n('log.memory.requestFailed', { error: err.message }));
     }
 }
 
 async function releaseMemory() {
     ensureSignalR();
     try {
-        logEvent('memory', 'Releasing all allocated memory...');
+        logEvent('memory', i18n('log.memory.releasing'));
         const response = await fetch(`${CONFIG.apiBaseUrl}/memory/release-memory`, {
             method: 'POST'
         });
@@ -1267,13 +1267,13 @@ async function releaseMemory() {
             });
             updateActiveSimulationsUI();
             const releasedMb = result.releasedMegabytes ?? (result.releasedBytes / 1024 / 1024);
-            logEvent('memory', `Released ${result.releasedBlockCount ?? 0} blocks (${releasedMb.toFixed(1)} MB)`);
+            logEvent('memory', i18n('log.memory.released', { blocks: result.releasedBlockCount ?? 0, size: releasedMb.toFixed(1) }));
         } else {
             const error = await response.json();
-            logEvent('memory', `Failed: ${error.detail || 'Unknown error'}`);
+            logEvent('memory', i18n('log.memory.releaseFailed', { error: error.detail || 'Unknown error' }));
         }
     } catch (err) {
-        logEvent('memory', `Request failed: ${err.message}`);
+        logEvent('memory', i18n('log.memory.releaseRequestFailed', { error: err.message }));
     }
 }
 
@@ -1284,7 +1284,7 @@ async function triggerThreadBlock() {
     const concurrent = parseInt(document.getElementById('threadConcurrent').value) || 100;
     
     try {
-        logEvent('threads', `Triggering thread blocking: ${concurrent} requests, ${delaySeconds}s delay...`);
+        logEvent('threads', i18n('log.thread.triggering', { count: concurrent, delay: delaySeconds }));
         const response = await fetch(`${CONFIG.apiBaseUrl}/threadblock/trigger-sync-over-async`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1297,13 +1297,13 @@ async function triggerThreadBlock() {
         if (response.ok) {
             const result = await response.json();
             addActiveSimulation(result.simulationId, 'threadblock', 'Thread Block');
-            logEvent('threads', withSimulationId(`Thread blocking started`, result.simulationId));
+            logEvent('threads', withSimulationId(i18n('log.thread.started'), result.simulationId));
         } else {
             const error = await response.json();
-            logEvent('threads', `Failed: ${error.detail || 'Unknown error'}`);
+            logEvent('threads', i18n('log.thread.failed', { error: error.detail || 'Unknown error' }));
         }
     } catch (err) {
-        logEvent('threads', `Request failed: ${err.message}`);
+        logEvent('threads', i18n('log.thread.requestFailed', { error: err.message }));
     }
 }
 
@@ -1313,22 +1313,22 @@ async function triggerThreadBlock() {
 async function stopThreadBlock() {
     ensureSignalR();
     try {
-        logEvent('threads', 'Stopping thread blocking simulations...');
+        logEvent('threads', i18n('log.thread.stopping'));
         const response = await fetch(`${CONFIG.apiBaseUrl}/threadblock/stop`, {
             method: 'POST'
         });
         
         if (response.ok) {
             const result = await response.json();
-            logEvent('threads', result.message || 'Thread blocking stopped');
+            logEvent('threads', result.message || i18n('log.thread.stopped'));
             // Remove thread block simulations from active list
             removeSimulationsByType('threadblock');
         } else {
             const error = await response.json();
-            logEvent('threads', `Stop request: ${error.detail || 'May have already stopped'}`);
+            logEvent('threads', i18n('log.thread.stopRequest', { error: error.detail || 'May have already stopped' }));
         }
     } catch (err) {
-        logEvent('threads', `Stop request: ${err.message || 'May have already stopped'}`);
+        logEvent('threads', i18n('log.thread.stopRequest', { error: err.message || 'May have already stopped' }));
     }
 }
 
@@ -1345,20 +1345,20 @@ async function triggerCrash() {
     
     // Confirmation dialog - always synchronous for Azure Crash Monitoring
     const confirmed = confirm(
-        `⚠️ WARNING: This will CRASH the application!\n\n` +
-        `Crash Type: ${crashType}\n` +
-        `\nThe application will terminate and Azure will auto-restart it.\n` +
-        `✓ Azure Crash Monitoring will capture this crash.\n` +
-        `\nAre you sure you want to proceed?`
+        i18n('log.crash.confirmTitle') + '\n\n' +
+        i18n('log.crash.confirmType', { type: crashType }) + '\n' +
+        '\n' + i18n('log.crash.confirmBody')
     );
     
     if (!confirmed) {
-        logEvent('crash', 'Crash cancelled by user');
+        logEvent('crash', i18n('log.crash.cancelled'));
         return;
     }
     
     try {
-        logEvent('crash', `CRASH: ${crashType}${delaySeconds > 0 ? ` in ${delaySeconds}s` : ''} - Connection will be lost!`);
+        logEvent('crash', delaySeconds > 0 
+            ? i18n('log.crash.triggeringDelayed', { type: crashType, delay: delaySeconds })
+            : i18n('log.crash.triggering', { type: crashType }));
         
         const response = await fetch(`${CONFIG.apiBaseUrl}/crash/trigger`, {
             method: 'POST',
@@ -1374,7 +1374,7 @@ async function triggerCrash() {
         // If synchronous, we shouldn't get here (process crashed)
         if (response.ok) {
             const result = await response.json();
-            logEvent('crash', `💀 ${result.message}`);
+            logEvent('crash', i18n('log.crash.result', { message: result.message }));
             
             // Show countdown for async crashes
             if (!synchronous && delaySeconds > 0) {
@@ -1382,23 +1382,23 @@ async function triggerCrash() {
                 const countdownInterval = setInterval(() => {
                     countdown--;
                     if (countdown > 0) {
-                        logEvent('crash', `Crash in ${countdown}...`);
+                        logEvent('crash', i18n('log.crash.countdown', { seconds: countdown }));
                     } else {
-                        logEvent('crash', 'CRASHING NOW!');
+                        logEvent('crash', i18n('log.crash.now'));
                         clearInterval(countdownInterval);
                     }
                 }, 1000);
             }
         } else {
             const error = await response.json();
-            logEvent('crash', `Failed: ${error.message || 'Unknown error'}`);
+            logEvent('crash', i18n('log.crash.failed', { error: error.message || 'Unknown error' }));
         }
     } catch (err) {
         // For synchronous crashes, a network error is expected (connection lost)
         if (synchronous) {
-            logEvent('crash', 'Application crashed! Connection lost. Waiting for restart...');
+            logEvent('crash', i18n('log.crash.connectionLost'));
         } else {
-            logEvent('crash', `Request failed: ${err.message}`);
+            logEvent('crash', i18n('log.crash.requestFailed', { error: err.message }));
         }
     }
 }
@@ -1438,21 +1438,21 @@ async function startSlowRequests() {
         if (response.ok) {
             const result = await response.json();
             addActiveSimulation(result.simulationId, 'slowrequest', 'Slow Requests');
-            logEvent('slowrequest', withSimulationId(`Slow request simulation started`, result.simulationId));
-            statusDiv.textContent = `Running: ${durationSeconds}s requests every ${intervalSeconds}s (max ${maxRequests})`;
+            logEvent('slowrequest', withSimulationId(i18n('log.slow.started', { duration: durationSeconds, interval: intervalSeconds, max: maxRequests }), result.simulationId));
+            statusDiv.textContent = i18n('log.slow.statusRunning', { duration: durationSeconds, interval: intervalSeconds, max: maxRequests });
             statusDiv.classList.add('active');
             
             // Start polling for status
             pollSlowRequestStatus();
         } else {
             const error = await response.json();
-            logEvent('slowrequest', `Failed to start: ${error.message || error.title || 'Unknown error'}`);
+            logEvent('slowrequest', i18n('log.slow.failedToStart', { error: error.message || error.title || 'Unknown error' }));
             startBtn.disabled = false;
             stopBtn.disabled = true;
             statusDiv.classList.remove('active');
         }
     } catch (err) {
-        logEvent('slowrequest', `Request failed: ${err.message}`);
+        logEvent('slowrequest', i18n('log.slow.requestFailed', { error: err.message }));
         startBtn.disabled = false;
         stopBtn.disabled = true;
         statusDiv.classList.remove('active');
@@ -1469,7 +1469,7 @@ async function stopSlowRequests() {
     const stopBtn = document.getElementById('btnStopSlowRequests');
     
     try {
-        logEvent('slowrequest', 'Stopping slow request simulator...');
+        logEvent('slowrequest', i18n('log.slow.stopping'));
         
         const response = await fetch(`${CONFIG.apiBaseUrl}/slowrequest/stop`, {
             method: 'POST'
@@ -1477,13 +1477,13 @@ async function stopSlowRequests() {
         
         if (response.ok) {
             const result = await response.json();
-            logEvent('slowrequest', `${result.message}`);
+            logEvent('slowrequest', result.message || i18n('log.slow.stopped'));
         } else {
             const error = await response.json();
-            logEvent('slowrequest', `Stop request: ${error.message || 'May have already stopped'}`);
+            logEvent('slowrequest', i18n('log.slow.stopRequest', { error: error.message || 'May have already stopped' }));
         }
     } catch (err) {
-        logEvent('slowrequest', `Request failed: ${err.message}`);
+        logEvent('slowrequest', i18n('log.slow.requestFailed', { error: err.message }));
     } finally {
         startBtn.disabled = false;
         stopBtn.disabled = true;
@@ -1507,7 +1507,7 @@ async function startFailedRequests() {
     const startBtn = document.getElementById('btnStartFailedRequests');
     
     try {
-        logEvent('failedrequests', `Generating ${requestCount} HTTP 500 errors...`);
+        logEvent('failedrequests', i18n('log.failed.generating', { count: requestCount }));
         
         startBtn.disabled = true;
         
@@ -1522,17 +1522,17 @@ async function startFailedRequests() {
         if (response.ok) {
             const result = await response.json();
             addActiveSimulation(result.simulationId, 'failedrequest', 'Failed Requests');
-            logEvent('failedrequests', withSimulationId(`Started generating ${requestCount} failures`, result.simulationId));
+            logEvent('failedrequests', withSimulationId(i18n('log.failed.started', { count: requestCount }), result.simulationId));
             
             // Start polling for completion
             pollFailedRequestStatus();
         } else {
             const error = await response.json();
-            logEvent('failedrequests', `Failed to start: ${error.message || error.title || 'Unknown error'}`);
+            logEvent('failedrequests', i18n('log.failed.failedToStart', { error: error.message || error.title || 'Unknown error' }));
             startBtn.disabled = false;
         }
     } catch (err) {
-        logEvent('failedrequests', `Request failed: ${err.message}`);
+        logEvent('failedrequests', i18n('log.failed.requestFailed', { error: err.message }));
         startBtn.disabled = false;
     }
 }
@@ -1546,7 +1546,7 @@ async function stopFailedRequests() {
     const startBtn = document.getElementById('btnStartFailedRequests');
     
     try {
-        logEvent('failedrequests', 'Stopping failed request simulator...');
+        logEvent('failedrequests', i18n('log.failed.stopping'));
         
         const response = await fetch(`${CONFIG.apiBaseUrl}/failedrequest/stop`, {
             method: 'POST'
@@ -1554,14 +1554,14 @@ async function stopFailedRequests() {
         
         if (response.ok) {
             const result = await response.json();
-            logEvent('failedrequests', result.message || 'Stopped');
+            logEvent('failedrequests', result.message || i18n('log.failed.stopped'));
             removeSimulationsByType('failedrequest');
         } else {
             const error = await response.json();
-            logEvent('failedrequests', `Stop request: ${error.message || 'May have already completed'}`);
+            logEvent('failedrequests', i18n('log.failed.stopRequest', { error: error.message || 'May have already completed' }));
         }
     } catch (err) {
-        logEvent('failedrequests', `Request failed: ${err.message}`);
+        logEvent('failedrequests', i18n('log.failed.requestFailed', { error: err.message }));
     } finally {
         startBtn.disabled = false;
     }
@@ -1590,7 +1590,7 @@ async function pollFailedRequestStatus() {
                 state.lastFailedRequestCompletedAt = Date.now();
                 
                 if (status.requestsCompleted > 0) {
-                    logEvent('failedrequests', `Completed: Generated ${status.requestsCompleted} HTTP 500 errors`);
+                    logEvent('failedrequests', i18n('log.failed.completed', { count: status.requestsCompleted }));
                 }
             }
         }
@@ -1615,7 +1615,7 @@ async function pollSlowRequestStatus() {
             const status = await response.json();
             
             if (status.isRunning) {
-                statusDiv.textContent = `Running: ${status.requestsCompleted}/${status.requestsSent} completed, ${status.requestsInProgress} active`;
+                statusDiv.textContent = i18n('log.slow.statusPolling', { completed: status.requestsCompleted, sent: status.requestsSent, active: status.requestsInProgress });
                 statusDiv.classList.add('active');
 
                 // Ensure overlay is active if running (in case page was refreshed)
@@ -1632,7 +1632,7 @@ async function pollSlowRequestStatus() {
                 setTimeout(pollSlowRequestStatus, 5000);
             } else {
                 // Simulation ended
-                statusDiv.textContent = `Completed: ${status.requestsCompleted}/${status.requestsSent} requests`;
+                statusDiv.textContent = i18n('log.slow.statusCompleted', { completed: status.requestsCompleted, sent: status.requestsSent });
                 setTimeout(() => {
                     statusDiv.classList.remove('active');
                     statusDiv.textContent = '';
@@ -1648,7 +1648,7 @@ async function pollSlowRequestStatus() {
                 if (msg) msg.style.display = 'none';
 
                 if (status.requestsCompleted > 0) {
-                    logEvent('slowrequest', `Slow request simulation completed: ${status.requestsCompleted} requests`);
+                    logEvent('slowrequest', i18n('log.slow.completed', { count: status.requestsCompleted }));
                 }
             }
         }
@@ -1700,7 +1700,7 @@ function handleSimulationCompleted(simulationType, simulationId) {
     
     // Don't log SlowRequest completion here - the polling handler logs with request count
     if (simulationType !== 'SlowRequest') {
-        logEvent(category, withSimulationId(`${simulationType} simulation completed`, simulationId));
+        logEvent(category, withSimulationId(i18n('log.sim.completed', { type: simulationType }), simulationId));
     }
 
     // Handle SlowRequest specific UI
@@ -1740,7 +1740,7 @@ function updateActiveSimulationsUI() {
     const container = document.getElementById('simulationsList');
     
     if (state.activeSimulations.size === 0) {
-        container.innerHTML = '<p class="no-simulations">No active simulations</p>';
+        container.innerHTML = `<p class="no-simulations">${i18n('activeSims.none')}</p>`;
         return;
     }
     
@@ -1779,7 +1779,7 @@ function copyEventLog() {
     navigator.clipboard.writeText(logText).then(() => {
         const btn = document.getElementById('btnCopyEventLog');
         const originalText = btn.textContent;
-        btn.textContent = '✓ Copied!';
+        btn.textContent = i18n('eventLog.copied');
         btn.classList.add('copied');
         setTimeout(() => {
             btn.textContent = originalText;
@@ -1787,7 +1787,7 @@ function copyEventLog() {
         }, 2000);
     }).catch(err => {
         console.error('Failed to copy event log:', err);
-        alert('Failed to copy to clipboard');
+        alert(i18n('eventLog.copyFailed'));
     });
 }
 
@@ -1920,7 +1920,7 @@ async function fetchAzureSku() {
             const data = await response.json();
             const skuElement = document.getElementById('skuDisplay');
             if (skuElement && data.processInfo && data.processInfo.azureSku) {
-                skuElement.textContent = `SKU: ${data.processInfo.azureSku}`;
+                skuElement.textContent = `${i18n('sku.prefix')} ${data.processInfo.azureSku}`;
                 skuElement.style.display = 'block';
             }
             
@@ -1930,9 +1930,9 @@ async function fetchAzureSku() {
                 const computerName = data.processInfo.computerName;
                 
                 if (sku === 'Local' || !computerName) {
-                    logEvent('system', 'Application is currently running on Local');
+                    logEvent('system', i18n('log.system.runningLocal'));
                 } else {
-                    logEvent('system', `Application is currently running on ${sku} SKU on worker ${computerName}`);
+                    logEvent('system', i18n('log.system.runningSku', { sku: sku, worker: computerName }));
                 }
             }
         }
@@ -1990,6 +1990,11 @@ async function fetchAppConfig() {
                 CONFIG.idleTimeoutMinutes = config.idleTimeoutMinutes;
                 console.log(`Idle timeout set to ${CONFIG.idleTimeoutMinutes}m`);
             }
+
+            // Store UI language for I18N initialization
+            if (config.uiLanguage) {
+                CONFIG.uiLanguage = config.uiLanguage;
+            }
             
             // Update page footer if configured
             const footerElement = document.getElementById('pageFooterContent');
@@ -2013,6 +2018,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Fetch app configuration
     await fetchAppConfig();
+    
+    // Initialize i18n (must be after fetchAppConfig so uiLanguage is known)
+    const uiLang = CONFIG.uiLanguage || 'en';
+    await I18N.init(uiLang);
     
     // Fetch build info (non-blocking)
     fetchBuildInfo();
@@ -2049,9 +2058,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeSidePanel();
     
     // Log init messages in display order (prepended: first logged = bottom of log)
-    logEvent('warning', '⚖️ Deploy only in isolated, non-production environments. Licensed under MIT License.');
-    logEvent('warning', '⚖️ This software is provided "AS IS" without warranty. The author shall not be liable for any damages arising from use or misuse.');
-    logEvent('system', `Dashboard initialized (probe rate: ${CONFIG.latencyProbeIntervalMs}ms, idle timeout: ${CONFIG.idleTimeoutMinutes}m)`);
+    // IMPORTANT: These must fire AFTER I18N.init() so i18n() has translations loaded
+    logEvent('warning', i18n('log.warning.license'));
+    logEvent('warning', i18n('log.warning.disclaimer'));
+    logEvent('system', i18n('log.system.initialized', { probeRate: CONFIG.latencyProbeIntervalMs, idleTimeout: CONFIG.idleTimeoutMinutes }));
 
     // Await SKU fetch so its message appears before hub connection messages
     await fetchAzureSku();

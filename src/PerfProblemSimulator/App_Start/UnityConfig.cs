@@ -105,6 +105,14 @@ namespace PerfProblemSimulator.App_Start
             container.RegisterType<LatencyProbeService>(
                 new ContainerControlledLifetimeManager());
 
+            // TranslationService - Translates UI strings using Azure Translator API
+            container.RegisterType<ITranslationService, TranslationService>(
+                new ContainerControlledLifetimeManager());
+
+            // TranslationStartupService - Runs translation at startup
+            container.RegisterType<TranslationStartupService>(
+                new ContainerControlledLifetimeManager());
+
             // -----------------------------------------------------------------------------
             // Transient Services (new instance per request)
             // -----------------------------------------------------------------------------

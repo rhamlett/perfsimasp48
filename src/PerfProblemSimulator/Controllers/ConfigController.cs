@@ -81,7 +81,8 @@ namespace PerfProblemSimulator.Controllers
                 PageFooter = pageFooter,
                 GithubRepoUrl = githubRepoUrl,
                 LatencyProbeIntervalMs = ConfigurationHelper.LatencyProbeIntervalMs,
-                IdleTimeoutMinutes = _idleStateService.IdleTimeoutMinutes
+                IdleTimeoutMinutes = _idleStateService.IdleTimeoutMinutes,
+                UiLanguage = ConfigurationHelper.UiLanguage
             });
         }
     }
@@ -111,5 +112,10 @@ namespace PerfProblemSimulator.Controllers
         /// How long until the app goes idle (stops probing) in minutes.
         /// </summary>
         public int IdleTimeoutMinutes { get; set; } = 20;
+
+        /// <summary>
+        /// The UI language code for the dashboard (e.g., "en", "es", "ja").
+        /// </summary>
+        public string UiLanguage { get; set; } = "en";
     }
 }

@@ -35,7 +35,11 @@ namespace PerfProblemSimulator.App_Start
                 {
                     MetricsCollectionIntervalMs = MetricsCollectionIntervalMs,
                     LatencyProbeIntervalMs = LatencyProbeIntervalMs,
-                    DisableProblemEndpoints = DisableProblemEndpoints
+                    DisableProblemEndpoints = DisableProblemEndpoints,
+                    UiLanguage = UiLanguage,
+                    TranslatorApiKey = TranslatorApiKey,
+                    TranslatorEndpoint = TranslatorEndpoint,
+                    TranslatorRegion = TranslatorRegion
                 };
             }
         }
@@ -154,6 +158,90 @@ namespace PerfProblemSimulator.App_Start
         public static string GetInstanceId()
         {
             return Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
+        }
+
+        /// <summary>
+        /// Gets the UI language code (e.g., "en", "es", "ja").
+        /// </summary>
+        /// <remarks>
+        /// Can be configured via environment variable: <c>UI_LANGUAGE</c>
+        /// </remarks>
+        public static string UiLanguage
+        {
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("UI_LANGUAGE");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue.Trim().ToLowerInvariant();
+                }
+
+                var value = ConfigurationManager.AppSettings["UiLanguage"];
+                return !string.IsNullOrEmpty(value) ? value.Trim().ToLowerInvariant() : "en";
+            }
+        }
+
+        /// <summary>
+        /// Gets the Azure Cognitive Services Translator API key.
+        /// </summary>
+        /// <remarks>
+        /// Can be configured via environment variable: <c>TRANSLATOR_API_KEY</c>
+        /// </remarks>
+        public static string TranslatorApiKey
+        {
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("TRANSLATOR_API_KEY");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue.Trim();
+                }
+
+                return ConfigurationManager.AppSettings["TranslatorApiKey"] ?? "";
+            }
+        }
+
+        /// <summary>
+        /// Gets the Azure Cognitive Services Translator endpoint URL.
+        /// </summary>
+        /// <remarks>
+        /// Can be configured via environment variable: <c>TRANSLATOR_ENDPOINT</c>
+        /// </remarks>
+        public static string TranslatorEndpoint
+        {
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("TRANSLATOR_ENDPOINT");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue.Trim().TrimEnd('/');
+                }
+
+                var value = ConfigurationManager.AppSettings["TranslatorEndpoint"];
+                return !string.IsNullOrEmpty(value)
+                    ? value.Trim().TrimEnd('/')
+                    : "https://api.cognitive.microsofttranslator.com";
+            }
+        }
+
+        /// <summary>
+        /// Gets the Azure Cognitive Services Translator region.
+        /// </summary>
+        /// <remarks>
+        /// Can be configured via environment variable: <c>TRANSLATOR_REGION</c>
+        /// </remarks>
+        public static string TranslatorRegion
+        {
+            get
+            {
+                var envValue = Environment.GetEnvironmentVariable("TRANSLATOR_REGION");
+                if (!string.IsNullOrEmpty(envValue))
+                {
+                    return envValue.Trim();
+                }
+
+                return ConfigurationManager.AppSettings["TranslatorRegion"] ?? "eastus";
+            }
         }
     }
 }
